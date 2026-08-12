@@ -1,0 +1,43 @@
+Package: clinicaldeidpoc
+Type: Package
+Title: Clinical Data De-identification Proof of Concept
+Version: 0.1.0
+Author: Ramnath Dhadage [aut, cre]
+Maintainer: Ramnath Dhadage <maintainer@example.invalid>
+Authors@R: person(
+    given = "Ramnath",
+    family = "Dhadage",
+    email = "ramnath.dhadage@example.invalid",
+    role = c("aut", "cre")
+  )
+Description: A synthetic-only, fail-closed foundation for a clinical data
+    de-identification proof of concept. The initial milestone implements
+    deterministic structured-field handling and deliberately blocks release
+    until free-text processing, validation, and independent approval exist.
+License: MIT + file LICENSE
+Encoding: UTF-8
+RoxygenNote: 7.3.3
+Depends:
+    R (>= 4.5.2)
+Imports:
+    digest,
+    DT,
+    readxl,
+    shiny,
+    writexl,
+    yaml
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Collate:
+    'bootstrap.R'
+    'conditions.R'
+    'config.R'
+    'input.R'
+    'schema.R'
+    'structured_rules.R'
+    'validation.R'
+    'workflow_state.R'
+    'audit.R'
+    'export.R'
+    'shiny_app.R'

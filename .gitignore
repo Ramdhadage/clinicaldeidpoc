@@ -1,0 +1,16 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.Renviron
+.Renviron.*
+!.Renviron.example
+.r-lib/
+runtime/input/*
+runtime/output/*
+runtime/logs/*
+runtime/check/
+data/phi/
+evaluation/approved_phi/
+*.log
+*.tar.gz

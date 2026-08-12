@@ -1,0 +1,42 @@
+schema_version: "0.1.0"
+sheet_name: "Clinical_Data"
+allow_additional_sheets: true
+allow_additional_columns: false
+canonicalize_column_order: true
+columns:
+  - name: "Record_No"
+    role: "direct_identifier"
+    type: "integer_like"
+    required: true
+    action: "remove"
+  - name: "Patient_Name"
+    role: "direct_identifier"
+    type: "character"
+    required: true
+    action: "remove"
+  - name: "DOB"
+    role: "date_identifier"
+    type: "date_text"
+    required: true
+    action: "keep_year_or_90_plus"
+  - name: "Diagnosis_Journey"
+    role: "free_text"
+    type: "character"
+    required: true
+    action: "pending_text_processing"
+  - name: "Treatment_History"
+    role: "free_text"
+    type: "character"
+    required: true
+    action: "pending_text_processing"
+  - name: "MRN"
+    role: "direct_identifier"
+    type: "character"
+    required: true
+    action: "remove"
+  - name: "Patient_ID"
+    role: "direct_identifier"
+    type: "character"
+    required: true
+    action: "remove"
+

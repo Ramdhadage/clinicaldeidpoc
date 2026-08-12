@@ -1,0 +1,9 @@
+configuration_version: "0.1.0"
+mode: "synthetic_only"
+release_enabled: false
+azure:
+  enabled: false
+limits:
+  max_file_bytes: 10485760
+  max_rows: 10000
+

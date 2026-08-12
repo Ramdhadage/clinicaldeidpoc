@@ -1,0 +1,14 @@
+^\.Rproj\.user$
+^.*\.Rproj$
+^\.Rprofile$
+^\.Rhistory$
+^\.git$
+^\.gitignore$
+^\.r-lib$
+^Clinical_PHI_Anonymization_Test_Data - Test_Data\.csv$
+^doc$
+^renv$
+^renv\.lock$
+^rsconnect$
+^runtime$
+^scripts$
