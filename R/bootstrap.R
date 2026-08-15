@@ -28,6 +28,7 @@ load_deid_modules <- function(
     "input.R",
     "schema.R",
     "structured_rules.R",
+    "tagged_preview.R",
     "validation.R",
     "workflow_state.R",
     "audit.R",

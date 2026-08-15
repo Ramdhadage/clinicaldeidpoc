@@ -1,12 +1,45 @@
 policy_id: "safe_harbor_candidate"
-policy_version: "0.1.0"
+policy_version: "0.3.0"
 status: "PROPOSED_REQUIRES_APPROVAL"
 profile: "safe_harbor_candidate"
 reference_date: "2026-08-12"
 direct_identifier_action: "remove"
 date_action: "keep_year_or_90_plus"
 age_90_plus_value: "90+"
-free_text_action: "pending_text_processing"
-narrative_preview_placeholder: "[PENDING_TEXT_DEIDENTIFICATION]"
-stable_tokens_enabled: false
-
+free_text_action: "deterministic_tagged_preview_only"
+preview:
+  enabled: true
+  mode: "synthetic_deterministic_tagged"
+  structured_id:
+    mode: "run_scoped_random_hex"
+    columns:
+      - "Record_No"
+      - "MRN"
+      - "Patient_ID"
+    length: 8
+    alphabet: "lowercase_hex"
+    source_derived: false
+    persist: false
+  failure_placeholder: "[REDACTION FAILED]"
+  tags:
+    name: "[Name]"
+    geographic_subdivision: "[Geographic Subdivision]"
+    zip_code: "[ZIP Code]"
+    date: "[{year}]"
+    age_90_or_older: "[Age: 90 or older]"
+    telephone_number: "[Telephone Number]"
+    fax_number: "[Fax Number]"
+    email: "[Email]"
+    ssn: "[SSN]"
+    medical_record_number: "[Medical Record Number]"
+    health_plan_number: "[Health Plan Beneficiary Number]"
+    account_number: "[Account Number]"
+    certificate_license_number: "[Certificate/License Number]"
+    vehicle_identifier: "[Vehicle Identifier]"
+    device_identifier: "[Device Identifier]"
+    url: "[URL]"
+    ip_address: "[IP Address]"
+    biometric_identifier: "[Biometric Identifier]"
+    facility: "[Facility]"
+    other_unique_identifier: "[Other Unique Identifier]"
+cross_run_stable_tokens_enabled: false

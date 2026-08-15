@@ -6,6 +6,7 @@
 ^\.gitignore$
 ^\.r-lib$
 ^Clinical_PHI_Anonymization_Test_Data - Test_Data\.csv$
+^.*\.xlsx$
 ^doc$
 ^renv$
 ^renv\.lock$

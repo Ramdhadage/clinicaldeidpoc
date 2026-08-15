@@ -1,7 +1,7 @@
 Package: clinicaldeidpoc
 Type: Package
 Title: Clinical Data De-identification Proof of Concept
-Version: 0.1.0
+Version: 0.3.0
 Author: Ramnath Dhadage [aut, cre]
 Maintainer: Ramnath Dhadage <maintainer@example.invalid>
 Authors@R: person(
@@ -12,8 +12,10 @@ Authors@R: person(
   )
 Description: A synthetic-only, fail-closed foundation for a clinical data
     de-identification proof of concept. The initial milestone implements
-    deterministic structured-field handling and deliberately blocks release
-    until free-text processing, validation, and independent approval exist.
+    deterministic structured-field handling, source-independent run-scoped
+    hexadecimal display tokens, and a synthetic-only tagged narrative preview.
+    It deliberately blocks release until validated free-text processing and
+    independent approval exist.
 License: MIT + file LICENSE
 Encoding: UTF-8
 RoxygenNote: 7.3.3
@@ -22,6 +24,7 @@ Depends:
 Imports:
     digest,
     DT,
+    openssl,
     readxl,
     shiny,
     writexl,
@@ -36,6 +39,7 @@ Collate:
     'input.R'
     'schema.R'
     'structured_rules.R'
+    'tagged_preview.R'
     'validation.R'
     'workflow_state.R'
     'audit.R'

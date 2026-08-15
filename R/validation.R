@@ -66,7 +66,10 @@ validate_structured_result <- function(
     schema_columns(config)$role == "free_text"
   ]
   blockers <- data.frame(
-    code = rep("TEXT_PROCESSING_PENDING", length(narrative_columns)),
+    code = rep(
+      "NARRATIVE_REDACTION_NOT_VALIDATED",
+      length(narrative_columns)
+    ),
     column = narrative_columns,
     severity = rep("Critical", length(narrative_columns)),
     stringsAsFactors = FALSE
@@ -80,33 +83,11 @@ validate_structured_result <- function(
       column_contract_preserved = TRUE,
       direct_values_removed = TRUE,
       dob_generalization_valid = TRUE,
+      tagged_preview_only = TRUE,
+      narrative_redaction_validated = FALSE,
       blockers = blockers,
       validated_at = utc_now()
     ),
     class = c("ValidationSummary", "list")
   )
 }
-
-
-create_safe_preview <- function(
-    run,
-    config = read_deid_config(".")
-) {
-  if (is.null(run$result) || !inherits(run$result, "StructuredResult")) {
-    return(NULL)
-  }
-
-  preview <- run$result$data
-  narrative_columns <- schema_columns(config)$name[
-    schema_columns(config)$role == "free_text"
-  ]
-  placeholder <- config$policy$narrative_preview_placeholder
-
-  for (column in narrative_columns) {
-    present <- !is.na(preview[[column]])
-    preview[[column]][present] <- placeholder
-  }
-
-  preview
-}
-

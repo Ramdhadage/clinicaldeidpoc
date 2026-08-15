@@ -1,5 +1,5 @@
 # Clinical Data De-identification PoC
-# Milestone 1: synthetic-only structured processing; release is disabled.
+# Milestone 1.2: synthetic-only tagged preview; release is disabled.
 
 if (!exists("read_deid_config", mode = "function")) {
   source(file.path("R", "bootstrap.R"))

@@ -1,8 +1,8 @@
-# Clinical De-identification PoC — Milestone 1 Run Guide
+# Clinical De-identification PoC — Milestone 1.2 Run Guide
 
 ## 1. What This Milestone Implements
 
-Milestone 1 is a **synthetic-only, non-releasing structured-data foundation**.
+Milestone 1.2 is a **synthetic-only, non-releasing structured-data foundation with run-scoped hexadecimal ID tokens and a deterministic narrative preview**.
 
 It currently:
 
@@ -18,13 +18,44 @@ It currently:
   - **Patient_ID**
 - Removes all values from Record_No, Patient_Name, MRN, and Patient_ID.
 - Converts DOB to a four-digit year or **90+**.
-- Hides narrative text in the UI behind **[PENDING_TEXT_DEIDENTIFICATION]**.
+- Displays `[Name]` for Patient_Name and independent random eight-character lowercase hexadecimal values for nonmissing Record_No, MRN, and Patient_ID cells without restoring their source values.
+- Generates the structured ID tokens from secure random bytes once per run, rejects collisions, keeps them only in session memory, and regenerates them for a new run.
+- Applies ordered deterministic tags to selected narrative patterns, including known names and identifiers, dates, contact details, URLs, IP addresses, labeled codes, addresses, ZIP codes, and facilities.
 - Invalidates previous results whenever another file is uploaded.
 - Blocks every download/export because Azure free-text processing, complete validation, human review, and approval have not yet been implemented.
 
 This milestone does **not** produce a releasable or HIPAA-de-identified dataset.
 
-> **Security restriction:** Use only the supplied synthetic test data. Do not upload real PHI to the local application.
+> **Security restriction:** Use only the generated fixture or data whose synthetic provenance has been independently confirmed. Do not upload real PHI to the local application.
+
+### Tagged-preview coverage
+
+HHS defines 18 Safe Harbor identifier types. The requested list contains 20 operational checks because it separates ZIP from geography and age over 89 from the date/age rule. The preview uses the following implementation status; **partial** means deterministic patterns can miss valid identifiers.
+
+| Operational check | Preview behavior | Coverage |
+|---|---|---|
+| Names | Known patient names and titled clinician names become [Name] | Partial |
+| Geographic subdivisions | Recognized addresses and selected location phrases become [Geographic Subdivision] | Partial |
+| ZIP codes | Full recognized ZIP becomes [ZIP Code]; no Census population decision is made | Conservative preview |
+| Dates except year | Recognized valid dates become [YYYY] | Partial |
+| Ages over 89 | Structured DOB, DOB-context narrative dates, or explicit ages become [Age: 90 or older] | Partial |
+| Telephone numbers | Recognized North American and selected international formats become [Telephone Number] | Partial |
+| Fax numbers | Fax-labeled numbers become [Fax Number] | Partial |
+| Email addresses | Recognized addresses become [Email] | Deterministic pattern |
+| Social Security numbers | Recognized formatted values become [SSN] | Partial |
+| Medical record numbers | Structured MRN cells use random 8-character hex tokens; known or labeled narrative values become [Medical Record Number] | Partial |
+| Health-plan beneficiary numbers | Labeled values become [Health Plan Beneficiary Number] | Partial |
+| Account numbers | Labeled values become [Account Number] | Partial |
+| Certificate/license numbers | Labeled values become [Certificate/License Number] | Partial |
+| Vehicle identifiers | Labeled VIN/vehicle/plate values become [Vehicle Identifier] | Partial |
+| Device identifiers | Labeled device/implant/UDI values become [Device Identifier] | Partial |
+| Web URLs | Recognized URLs become [URL] | Deterministic pattern |
+| IP addresses | Valid IPv4 values become [IP Address] | IPv4 only |
+| Biometric identifiers | Only labeled textual biometric IDs become [Biometric Identifier] | Content unsupported |
+| Full-face photos | Workbooks containing drawings/media are rejected | No image redaction |
+| Other unique characteristics | Structured Record_No and Patient_ID cells use random 8-character hex tokens; known or labeled narrative codes become [Other Unique Identifier] | Partial |
+
+Official reference: [HHS de-identification guidance](https://www.hhs.gov/hipaa/for-professionals/special-topics/de-identification/index.html).
 
 ## 2. Repository Entry Points
 
@@ -37,7 +68,7 @@ This milestone does **not** produce a releasable or HIPAA-de-identified dataset.
 | R/ | Modular input, schema, transformation, validation, workflow, UI, and export-guard functions |
 | tests/run-core-tests.R | Core regression and fail-closed tests |
 | tests/run-app-tests.R | Shiny server/state safety tests |
-| scripts/create-sample-workbook.R | Converts the supplied CSV test data to the required XLSX format |
+| scripts/create-sample-workbook.R | Generates a small synthetic XLSX fixture with the required contract |
 | scripts/run-sample.R | Runs the pipeline without launching Shiny |
 | scripts/run-app.R | Starts the local Shiny application |
 
@@ -92,7 +123,7 @@ Run the core workbook, schema, transformation, state, and export-gate tests:
 
 Expected result:
 
-    Tests run: 16
+    Tests run: 22
     Failures: 0
     All core milestone tests passed.
 
@@ -106,21 +137,19 @@ Expected result:
 
 These tests use synthetic data and temporary XLSX files. They make no Azure or external network calls.
 
-## 7. Create the Sample XLSX Workbook
+## 7. Create or Confirm the Generated Sample XLSX Workbook
 
-The application does not accept CSV directly. It requires an XLSX workbook containing Clinical_Data.
+The application does not accept CSV directly. The CLI demonstration deliberately uses only the generated synthetic fixture at `runtime/input/Clinical_PHI_Anonymization_Data.xlsx`; it never selects a user-provided workbook from the project root.
 
-The sample workbook is generated at:
+Confirm whether the generated fixture exists:
 
-    runtime/input/Clinical_PHI_Anonymization_Test_Data.xlsx
+    Test-Path -LiteralPath "runtime/input/Clinical_PHI_Anonymization_Data.xlsx"
 
-If that file is absent, create it with:
+If the result is `False`, create it:
 
-    if (-not (Test-Path -LiteralPath "runtime\input\Clinical_PHI_Anonymization_Test_Data.xlsx")) {
-        & $rscript --vanilla scripts/create-sample-workbook.R
-    }
+    & $rscript --vanilla scripts/create-sample-workbook.R
 
-The script intentionally refuses to overwrite an existing workbook.
+To evaluate another workbook, use the Shiny upload flow only after its synthetic provenance has been confirmed. Do not substitute real PHI.
 
 ## 8. Run the Pipeline Without Shiny
 
@@ -132,11 +161,13 @@ Expected summary:
     Release allowed: FALSE
     Blocking items: 2
 
-Expected safe-preview behavior:
+Expected tagged-preview behavior:
 
-- Record_No, Patient_Name, MRN, and Patient_ID contain missing values.
-- DOB contains only year values for the supplied sample.
-- Both narrative columns display [PENDING_TEXT_DEIDENTIFICATION].
+- Nonmissing Record_No, MRN, and Patient_ID cells display unique lowercase values matching `^[0-9a-f]{8}$`.
+- Patient_Name displays [Name].
+- DOB displays [YYYY] or [Age: 90 or older].
+- Detected narrative values display typed tags such as [Email], [URL], [IP Address], [Telephone Number], and [YYYY].
+- Undetected narrative text remains visible and may still contain identifiers.
 - No output workbook is released.
 
 ## 9. Run the Shiny Application
@@ -157,27 +188,29 @@ To stop the app, return to PowerShell and press **Ctrl+C**.
 
 ## 10. Use the Shiny Application
 
-1. Confirm that the red banner says **Synthetic data only**.
-2. Select:
+1. Confirm that the red banner says **Synthetic demonstration only**.
+2. Select the generated fixture (or another workbook whose synthetic provenance has been confirmed):
 
-       runtime/input/Clinical_PHI_Anonymization_Test_Data.xlsx
+       runtime/input/Clinical_PHI_Anonymization_Data.xlsx
 
 3. Select **I confirm this workbook contains synthetic test data only**.
-4. Select **Run structured processing**.
+4. Select **Generate tagged preview**.
 5. Confirm the status reports:
 
        Run state: PROCESSED
 
-6. Review the safe structured preview:
+6. Review **Synthetic tagged preview - not validated**:
 
-   - Direct identifier columns must be blank.
-   - DOB must contain only year or 90+.
-   - Narrative cells must show [PENDING_TEXT_DEIDENTIFICATION].
+   - Record_No, MRN, and Patient_ID must contain random eight-character lowercase hexadecimal values, not source values.
+   - Patient_Name must contain [Name].
+   - DOB must contain [YYYY] or [Age: 90 or older].
+   - Known patient names and selected deterministic patterns must be replaced with typed tags.
+   - Clinical text that was not detected remains visible for synthetic evaluation.
 
 7. Confirm two Critical blockers are shown:
 
-   - Diagnosis_Journey — TEXT_PROCESSING_PENDING
-   - Treatment_History — TEXT_PROCESSING_PENDING
+   - Diagnosis_Journey — NARRATIVE_REDACTION_NOT_VALIDATED
+   - Treatment_History — NARRATIVE_REDACTION_NOT_VALIDATED
 
 8. Confirm that no download button is available.
 
@@ -202,7 +235,8 @@ To stop the app, return to PowerShell and press **Ctrl+C**.
 - Do not deploy this milestone to the existing shinyapps.io target.
 - Do not enable release_enabled in config/poc.yml.
 - Do not add API keys, bearer tokens, or connection strings to .Rprofile, .Renviron, YAML files, or Git.
-- Do not describe the structured preview as anonymized or Safe Harbor compliant.
+- Do not describe the tagged preview as anonymized or Safe Harbor compliant.
+- Treat run-scoped hexadecimal preview tokens as sensitive, ephemeral pseudonymous values; do not persist, export, or use them for cross-run linkage.
 - Generated runtime files and the project-local R library are excluded by .gitignore.
 
 ## 13. Troubleshooting
@@ -237,10 +271,10 @@ Remove the unknown column from the test workbook or add it only through a formal
 
 ## 14. What Remains Before Real PHI
 
-The following are intentionally not implemented in Milestone 1:
+The following are intentionally not implemented in Milestone 1.2:
 
 - Azure AI Language Text PII integration
-- Local/Azure narrative detection and redaction
+- Validated Azure/NER narrative detection and redaction
 - Complete residual-PHI validation
 - Enterprise SSO and role-based access
 - Sanitized persistent audit/evidence storage
@@ -249,6 +283,6 @@ The following are intentionally not implemented in Milestone 1:
 - Releasable output
 - Organization-confirmed Azure, security, privacy, contractual, and retention controls
 
-The next technical milestone is the Azure free-text adapter and deterministic narrative preprocessing, using mocked responses first and no real PHI until Phase 0 governance approval is complete.
+The next technical milestone is the Azure free-text adapter, residual-identifier evaluation, and reviewed rule coverage, using mocked responses first and no real PHI until Phase 0 governance approval is complete.
 
 Before publishing the project as an R package, replace the placeholder maintainer email in DESCRIPTION with an approved organizational contact.

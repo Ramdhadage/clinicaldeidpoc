@@ -17,11 +17,12 @@ Locked planning decisions:
 - Released output: no stable identifiers or cross-run linkage.
 - Architecture: deterministic R pipeline plus Azure AI Language Text PII; no RAG or autonomous agent in the initial PoC.
 
-Implementation status as of 2026-08-12:
+Implementation status as of 2026-08-16:
 
-- Milestone 1, the synthetic-only structured-data foundation, is implemented.
-- The exact Clinical_Data schema, deterministic identifier removal, DOB generalization, safe preview, state invalidation, and server-side export guard have automated test evidence.
-- Free-text processing, Azure integration, complete validation, enterprise controls, human approval, and release remain unimplemented and blocking.
+- Milestone 1.2, the synthetic-only structured-data foundation with run-scoped hexadecimal ID tokens and a deterministic narrative preview, is implemented.
+- The exact Clinical_Data schema, deterministic identifier removal, DOB generalization, source-independent token generation, collision rejection, state invalidation, and server-side export guard have automated test evidence.
+- The tagged preview covers known values and selected deterministic patterns, but it is not validated for residual identifiers and is not a Safe Harbor determination.
+- Azure/NER text processing, complete residual validation, enterprise controls, human approval, and release remain unimplemented and blocking.
 - See [the step-by-step run guide](run-guide.md) for verified commands and current limitations.
 
 ## 1. PoC Objective
@@ -146,7 +147,7 @@ Component responsibilities:
 
 Structured defaults for the selected Safe Harbor-candidate profile:
 
-- Patient_Name, MRN, Patient_ID, and Record_No: remove from released values; do not create stable tokens.
+- Patient_Name, MRN, Patient_ID, and Record_No: remove from released values; do not create stable or cross-run tokens. The non-releasing synthetic preview may display ephemeral, independently generated run-scoped tokens for Record_No, MRN, and Patient_ID.
 - DOB and other patient-related dates: retain year only, subject to age-over-89 handling.
 - Sub-state geography: remove; retain state only.
 - Phone, email, URL, IP, account, licence, device, and other unique identifiers: remove or replace with typed non-reversible placeholders.
@@ -309,7 +310,7 @@ False negatives and residual PHI are Critical failures.
 | Row, column, and workbook integrity | 100% |
 | API/error behavior | 100% fail-closed; no partial output release |
 | Annotation quality before holdout freeze | Span-level inter-annotator F1 at least 0.95 |
-| Repeatability | Five identical runs with identical detections and output, excluding run IDs/timestamps |
+| Repeatability | Five identical runs with identical detections and normalized output, excluding run IDs/timestamps and run-scoped random preview tokens; token format and uniqueness are assessed separately |
 | Raw PHI in application logs/telemetry | Zero occurrences |
 
 Azure confidence thresholds will be calibrated by category against the development set. The service default will be recorded as a baseline; a threshold sweep will select the lowest operating point that satisfies approved recall and precision gates. Confidence will support triage, not determine whether a record is safe.

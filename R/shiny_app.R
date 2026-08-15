@@ -3,10 +3,10 @@ build_deid_ui <- function(config) {
     shiny::titlePanel("Clinical Data De-identification PoC"),
     shiny::tags$div(
       class = "alert alert-danger",
-      shiny::tags$strong("Synthetic data only. "),
+      shiny::tags$strong("Synthetic demonstration only. "),
       paste(
-        "Real PHI processing and release are disabled until the governance,",
-        "Azure text-processing, validation, and approval milestones are complete."
+        "The tagged preview can miss identifiers; do not upload real PHI.",
+        "Download and release remain disabled."
       )
     ),
     shiny::sidebarLayout(
@@ -23,7 +23,7 @@ build_deid_ui <- function(config) {
         ),
         shiny::actionButton(
           "process",
-          "Run structured processing",
+          "Generate tagged preview",
           class = "btn-primary"
         ),
         shiny::hr(),
@@ -40,20 +40,50 @@ build_deid_ui <- function(config) {
         shiny::uiOutput("run_status"),
         shiny::tags$h3("Approved column contract"),
         DT::DTOutput("classification"),
-        shiny::tags$h3("Safe structured preview"),
+        shiny::tags$h3("Synthetic tagged preview - not validated"),
         shiny::tags$p(
-          "Direct identifiers are blanked. Raw narrative text is never shown;",
-          "it remains pending the Azure text-processing milestone."
+          "Dates are displayed as [YYYY], and patient names use [Name].",
+          paste(
+            "Each nonmissing Record_No, MRN, and Patient_ID cell uses an",
+            "independent random eight-character hexadecimal preview token."
+          )
         ),
-        DT::DTOutput("safe_preview"),
-        shiny::tags$h3("Blocking items"),
+        shiny::tags$p(
+          paste(
+            "Tokens are generated independently of source values, remain stable",
+            "only within this run, and are held only in session memory."
+          ),
+          "Undetected text is shown and may still contain identifiers.",
+          "Use synthetic data only; this is not a HIPAA Safe Harbor determination."
+        ),
+        shiny::tags$details(
+          shiny::tags$summary("Coverage and tag behavior"),
+          shiny::tags$p(
+            paste(
+              "The run guide displays a 20-row coverage matrix mapped to the 18",
+              "HIPAA Safe Harbor identifier types. This preview attempts only",
+              "the deterministic subsets listed there, including known names",
+              "and identifiers, dates, contact details, labeled codes, addresses,",
+              "ZIP codes, facilities, and network identifiers."
+            )
+          ),
+          shiny::tags$p(
+            paste(
+              "Arbitrary names and locations, image or biometric content, and",
+              "other unique characteristics still require Azure/NER, residual",
+              "validation, and human review."
+            )
+          )
+        ),
+        DT::DTOutput("tagged_preview"),
+        shiny::tags$h3("Critical validation blockers"),
         DT::DTOutput("blockers"),
         shiny::tags$div(
           class = "alert alert-warning",
           shiny::tags$strong("Download unavailable. "),
           paste(
-            "No output can be released from this milestone because free-text",
-            "processing, complete validation, review, and approval are pending."
+            "No output can be released because Azure PII processing, residual-",
+            "identifier validation, human review, and approval are incomplete."
           )
         )
       )
@@ -129,6 +159,10 @@ build_deid_server <- function(config) {
       ignoreInit = TRUE
     )
 
+    tagged_preview_value <- shiny::reactive({
+      create_tagged_preview(run_value(), config)
+    })
+
     output$classification <- DT::renderDT({
       data <- schema_columns(config)
       DT::datatable(
@@ -157,30 +191,54 @@ build_deid_server <- function(config) {
       if (identical(run$state, "EMPTY") || identical(run$state, "RECEIVED")) {
         return(shiny::tags$div(
           class = "alert alert-info",
-          "Upload a synthetic XLSX workbook and run structured processing."
+          "Upload a synthetic XLSX workbook and generate a tagged preview."
         ))
       }
 
+      preview <- tagged_preview_value()
+      failed_cells <- if (is.null(preview)) {
+        0L
+      } else {
+        sum(
+          unlist(preview, use.names = FALSE) ==
+            config$policy$preview$failure_placeholder,
+          na.rm = TRUE
+        )
+      }
+      failure_note <- if (failed_cells > 0L) {
+        paste0(
+          " ",
+          failed_cells,
+          " preview cell(s) failed redaction and were hidden."
+        )
+      } else {
+        ""
+      }
+
       shiny::tags$div(
-        class = "alert alert-success",
-        shiny::tags$strong("Structured processing completed. "),
+        class = "alert alert-warning",
+        shiny::tags$strong("Preview generated for synthetic evaluation. "),
         paste0(
           "Run state: ",
           run$state,
-          ". Release remains blocked by ",
+          ". This preview is not validated for residual identifiers and is not ",
+          "releasable. ",
+          "Run-scoped ID tokens are display-only. ",
           nrow(run$blockers),
-          " pending text-processing item(s)."
+          " Critical blocker(s) remain.",
+          failure_note
         )
       )
     })
 
-    output$safe_preview <- DT::renderDT({
-      preview <- create_safe_preview(run_value(), config)
+    output$tagged_preview <- DT::renderDT({
+      preview <- tagged_preview_value()
       shiny::req(preview)
 
       DT::datatable(
         preview,
         rownames = FALSE,
+        escape = TRUE,
         options = list(
           pageLength = 10,
           scrollX = TRUE
@@ -209,4 +267,3 @@ build_deid_server <- function(config) {
     })
   }
 }
-

@@ -4,7 +4,7 @@ require_app <- "--app" %in% args
 source(file.path("R", "bootstrap.R"))
 activate_local_development_library(".")
 
-core_packages <- c("digest", "readxl", "writexl", "yaml")
+core_packages <- c("digest", "openssl", "readxl", "writexl", "yaml")
 app_packages <- c("shiny", "bslib", "DT")
 packages <- if (require_app) {
   c(core_packages, app_packages)

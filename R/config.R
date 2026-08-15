@@ -49,6 +49,14 @@ validate_deid_config <- function(config) {
   policy <- config$policy
   runtime <- config$runtime
 
+  if (!identical(schema$schema_version, "0.2.0")) {
+    deid_abort(
+      code = "INVALID_SCHEMA_VERSION",
+      message = "The schema configuration version is not supported.",
+      subclass = "deid_config_error"
+    )
+  }
+
   if (!identical(schema$sheet_name, "Clinical_Data")) {
     deid_abort(
       code = "INVALID_SHEET_CONFIGURATION",
@@ -94,6 +102,23 @@ validate_deid_config <- function(config) {
     )
   }
 
+  expected_actions <- c(
+    "remove",
+    "remove",
+    "keep_year_or_90_plus",
+    "deterministic_tagged_preview_only",
+    "deterministic_tagged_preview_only",
+    "remove",
+    "remove"
+  )
+  if (!identical(columns$action, expected_actions)) {
+    deid_abort(
+      code = "INVALID_ACTION_CONFIGURATION",
+      message = "The configured column actions do not match the approved contract.",
+      subclass = "deid_config_error"
+    )
+  }
+
   if (!identical(runtime$mode, "synthetic_only")) {
     deid_abort(
       code = "UNAPPROVED_RUNTIME_MODE",
@@ -119,10 +144,87 @@ validate_deid_config <- function(config) {
     )
   }
 
-  if (!identical(policy$stable_tokens_enabled, FALSE)) {
+  if (!identical(policy$cross_run_stable_tokens_enabled, FALSE)) {
     deid_abort(
       code = "STABLE_TOKENS_NOT_ALLOWED",
       message = "Stable identifier tokens are disabled for this milestone.",
+      subclass = "deid_config_error"
+    )
+  }
+
+  if (
+    !identical(policy$free_text_action, "deterministic_tagged_preview_only") ||
+    !isTRUE(policy$preview$enabled) ||
+    !identical(policy$preview$mode, "synthetic_deterministic_tagged")
+  ) {
+    deid_abort(
+      code = "INVALID_PREVIEW_CONFIGURATION",
+      message = "The synthetic deterministic tagged-preview policy is required.",
+      subclass = "deid_config_error"
+    )
+  }
+
+  structured_id <- policy$preview$structured_id
+  if (
+    !is.list(structured_id) ||
+    !identical(structured_id$mode, "run_scoped_random_hex") ||
+    !identical(
+      structured_id$columns,
+      c("Record_No", "MRN", "Patient_ID")
+    ) ||
+    !identical(as.integer(structured_id$length), 8L) ||
+    !identical(structured_id$alphabet, "lowercase_hex") ||
+    !identical(structured_id$source_derived, FALSE) ||
+    !identical(structured_id$persist, FALSE)
+  ) {
+    deid_abort(
+      code = "INVALID_STRUCTURED_PREVIEW_ID_CONFIGURATION",
+      message = "The run-scoped structured preview ID policy is invalid.",
+      subclass = "deid_config_error"
+    )
+  }
+
+  required_preview_tags <- c(
+    "name",
+    "geographic_subdivision",
+    "zip_code",
+    "date",
+    "age_90_or_older",
+    "telephone_number",
+    "fax_number",
+    "email",
+    "ssn",
+    "medical_record_number",
+    "health_plan_number",
+    "account_number",
+    "certificate_license_number",
+    "vehicle_identifier",
+    "device_identifier",
+    "url",
+    "ip_address",
+    "biometric_identifier",
+    "facility",
+    "other_unique_identifier"
+  )
+  configured_tags <- policy$preview$tags
+  if (
+    !is.list(configured_tags) ||
+    !all(required_preview_tags %in% names(configured_tags)) ||
+    any(!vapply(
+      configured_tags[required_preview_tags],
+      function(value) {
+        is.character(value) && length(value) == 1L && !is.na(value) && nzchar(value)
+      },
+      logical(1)
+    )) ||
+    !is.character(policy$preview$failure_placeholder) ||
+    length(policy$preview$failure_placeholder) != 1L ||
+    !nzchar(policy$preview$failure_placeholder) ||
+    !identical(configured_tags$date, "[{year}]")
+  ) {
+    deid_abort(
+      code = "INVALID_PREVIEW_TAG_CONFIGURATION",
+      message = "The tagged-preview labels are incomplete or invalid.",
       subclass = "deid_config_error"
     )
   }

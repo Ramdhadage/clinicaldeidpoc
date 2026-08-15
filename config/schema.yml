@@ -1,4 +1,4 @@
-schema_version: "0.1.0"
+schema_version: "0.2.0"
 sheet_name: "Clinical_Data"
 allow_additional_sheets: true
 allow_additional_columns: false
@@ -23,12 +23,12 @@ columns:
     role: "free_text"
     type: "character"
     required: true
-    action: "pending_text_processing"
+    action: "deterministic_tagged_preview_only"
   - name: "Treatment_History"
     role: "free_text"
     type: "character"
     required: true
-    action: "pending_text_processing"
+    action: "deterministic_tagged_preview_only"
   - name: "MRN"
     role: "direct_identifier"
     type: "character"
@@ -39,4 +39,3 @@ columns:
     type: "character"
     required: true
     action: "remove"
-

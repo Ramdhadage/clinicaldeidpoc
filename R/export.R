@@ -3,7 +3,7 @@ write_release_workbook <- function(
     path,
     config = read_deid_config(".")
 ) {
-  assert_release_allowed(run)
+  assert_release_allowed(run, config)
   assert_scalar_character(path, "path")
 
   if (!identical(tolower(tools::file_ext(path)), "xlsx")) {

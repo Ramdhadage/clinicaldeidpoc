@@ -25,6 +25,7 @@ new_deid_run <- function(config_hash, run_id = new_run_id()) {
       input = NULL,
       schema_validation = NULL,
       result = NULL,
+      preview_tokens = NULL,
       validation = NULL,
       blockers = empty_blockers(),
       binding = list(
@@ -116,7 +117,8 @@ failed_run_from_condition <- function(
 
 run_structured_deidentification <- function(
     input_dataset,
-    config = read_deid_config(".")
+    config = read_deid_config("."),
+    preview_token_factory = secure_random_hex_token
 ) {
   if (!inherits(input_dataset, "InputDataset")) {
     deid_abort(
@@ -137,6 +139,11 @@ run_structured_deidentification <- function(
   )
   run$schema_validation <- schema_validation
   run <- transition_run(run, "SCHEMA_VALIDATED")
+  run$preview_tokens <- create_preview_token_bundle(
+    source = schema_validation$data,
+    config = config,
+    token_factory = preview_token_factory
+  )
 
   structured_result <- transform_structured_fields(
     schema_validation,
@@ -157,10 +164,25 @@ run_structured_deidentification <- function(
 }
 
 
-can_release <- function(run) {
+can_release <- function(run, config = NULL) {
   if (!inherits(run, "DeidRun")) {
     return(FALSE)
   }
+
+  config_valid <- !is.null(config) &&
+    inherits(config, "DeidConfig") &&
+    isTRUE(tryCatch(
+      {
+        validate_deid_config(config)
+        TRUE
+      },
+      error = function(e) FALSE
+    ))
+  release_enabled <- config_valid && isTRUE(config$runtime$release_enabled)
+
+  narrative_release_ready <- !is.null(run$validation) &&
+    isTRUE(run$validation$narrative_redaction_validated) &&
+    !isTRUE(run$validation$tagged_preview_only)
 
   binding_complete <- all(vapply(
     run$binding,
@@ -170,7 +192,9 @@ can_release <- function(run) {
     logical(1)
   ))
 
-  identical(run$state, "APPROVED") &&
+  release_enabled &&
+    narrative_release_ready &&
+    identical(run$state, "APPROVED") &&
     !is.null(run$validation) &&
     isTRUE(run$validation$release_passed) &&
     is.data.frame(run$blockers) &&
@@ -180,8 +204,8 @@ can_release <- function(run) {
 }
 
 
-assert_release_allowed <- function(run) {
-  if (!can_release(run)) {
+assert_release_allowed <- function(run, config = NULL) {
+  if (!can_release(run, config)) {
     deid_abort(
       code = "EXPORT_NOT_APPROVED",
       message = paste(
@@ -194,4 +218,3 @@ assert_release_allowed <- function(run) {
 
   invisible(TRUE)
 }
-
