@@ -123,7 +123,7 @@ Run the core workbook, schema, transformation, state, and export-gate tests:
 
 Expected result:
 
-    Tests run: 22
+    Tests run: 27
     Failures: 0
     All core milestone tests passed.
 

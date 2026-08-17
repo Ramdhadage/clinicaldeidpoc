@@ -200,6 +200,15 @@ validate_config_for_test <- internal_function_for_test("validate_deid_config")
 generate_tokens_for_test <- internal_function_for_test(
   "generate_run_scoped_hex_ids"
 )
+release_binding_is_current_for_test <- internal_function_for_test(
+  "release_binding_is_current"
+)
+verify_release_workbook_for_test <- internal_function_for_test(
+  "verify_release_workbook"
+)
+build_validation_summary_for_test <- internal_function_for_test(
+  "build_validation_summary_sheet"
+)
 
 
 token_factory_from <- function(values) {
@@ -438,6 +447,25 @@ run_test("supported display dates and Excel timestamps retain the correct year",
     age_90_plus_value = config$policy$age_90_plus_value
   )
   expect_identical(unname(actual), expected)
+})
+
+
+run_test("two-digit DOB years never use R's implicit century cutoff", {
+  generalize <- function(value) {
+    generalize_dob_for_test(
+      value,
+      reference_date = as.Date(config$policy$reference_date),
+      age_90_plus_value = config$policy$age_90_plus_value
+    )
+  }
+
+  expect_identical(generalize("15-Dec-68"), "1968")
+  expect_identical(generalize("15-Dec-69"), "1969")
+  expect_deid_error(
+    generalize("15-Dec-20"),
+    "deid_invalid_date",
+    "AMBIGUOUS_DOB_YEAR"
+  )
 })
 
 
@@ -930,6 +958,127 @@ run_test("export is blocked and creates no file", {
     "EXPORT_NOT_APPROVED"
   )
   expect_false(file.exists(output_path))
+})
+
+
+run_test("release binding detects output changes after approval", {
+  path <- write_fixture_workbook(synthetic_fixture())
+  on.exit(unlink(path, force = TRUE), add = TRUE)
+  dataset <- read_clinical_workbook(
+    path,
+    original_name = "synthetic.xlsx",
+    config = config
+  )
+  run <- run_structured_deidentification(dataset, config)
+  run$approval_binding <- run$binding
+
+  expect_true(release_binding_is_current_for_test(run))
+
+  tampered <- run
+  tampered$result$data$Diagnosis_Journey[[1]] <- "Changed after approval"
+  expect_false(release_binding_is_current_for_test(tampered))
+})
+
+
+run_test("release verification accepts an exact workbook", {
+  path <- write_fixture_workbook(synthetic_fixture())
+  on.exit(unlink(path, force = TRUE), add = TRUE)
+  dataset <- read_clinical_workbook(
+    path,
+    original_name = "synthetic.xlsx",
+    config = config
+  )
+  run <- run_structured_deidentification(dataset, config)
+  summary <- build_validation_summary_for_test(run, config)
+  candidate <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(candidate, force = TRUE), add = TRUE)
+  writexl::write_xlsx(
+    list(
+      Clinical_Data = run$result$data,
+      Validation_Summary = summary
+    ),
+    candidate
+  )
+
+  expect_identical(
+    verify_release_workbook_for_test(
+      candidate,
+      run$result$data,
+      summary
+    ),
+    TRUE
+  )
+})
+
+
+run_test("release verification compares every exported data cell", {
+  path <- write_fixture_workbook(synthetic_fixture())
+  on.exit(unlink(path, force = TRUE), add = TRUE)
+  dataset <- read_clinical_workbook(
+    path,
+    original_name = "synthetic.xlsx",
+    config = config
+  )
+  run <- run_structured_deidentification(dataset, config)
+  summary <- build_validation_summary_for_test(run, config)
+
+  tampered_data <- run$result$data
+  tampered_data$Diagnosis_Journey[[1]] <- "Same shape, different content"
+  candidate <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(candidate, force = TRUE), add = TRUE)
+  writexl::write_xlsx(
+    list(
+      Clinical_Data = tampered_data,
+      Validation_Summary = summary
+    ),
+    candidate
+  )
+
+  expect_deid_error(
+    verify_release_workbook_for_test(
+      candidate,
+      run$result$data,
+      summary
+    ),
+    "deid_export_error",
+    "OUTPUT_VERIFICATION_FAILED"
+  )
+})
+
+
+run_test("release verification compares the validation summary", {
+  path <- write_fixture_workbook(synthetic_fixture())
+  on.exit(unlink(path, force = TRUE), add = TRUE)
+  dataset <- read_clinical_workbook(
+    path,
+    original_name = "synthetic.xlsx",
+    config = config
+  )
+  run <- run_structured_deidentification(dataset, config)
+  summary <- build_validation_summary_for_test(run, config)
+  tampered_summary <- summary
+  tampered_summary$value[tampered_summary$metric == "output_hash"] <-
+    paste(rep("0", 64L), collapse = "")
+
+  candidate <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(candidate, force = TRUE), add = TRUE)
+  writexl::write_xlsx(
+    list(
+      Clinical_Data = run$result$data,
+      Validation_Summary = tampered_summary
+    ),
+    candidate
+  )
+
+  expect_deid_error(
+    verify_release_workbook_for_test(
+      candidate,
+      run$result$data,
+      summary
+    ),
+    "deid_export_error",
+    "OUTPUT_VERIFICATION_FAILED"
+  )
 })
 
 

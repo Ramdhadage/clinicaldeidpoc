@@ -34,6 +34,7 @@ new_deid_run <- function(config_hash, run_id = new_run_id()) {
         output_hash = NULL
       ),
       approval_binding = NULL,
+      release_artifact = NULL,
       failure = NULL,
       created_at = utc_now(),
       updated_at = utc_now()
@@ -164,6 +165,28 @@ run_structured_deidentification <- function(
 }
 
 
+release_binding_is_current <- function(run) {
+  if (
+    !inherits(run, "DeidRun") ||
+    is.null(run$result) ||
+    is.null(run$result$data) ||
+    is.null(run$binding$output_hash) ||
+    is.null(run$approval_binding)
+  ) {
+    return(FALSE)
+  }
+
+  current_output_hash <- tryCatch(
+    hash_object(run$result$data),
+    error = function(e) NULL
+  )
+
+  !is.null(current_output_hash) &&
+    identical(run$binding$output_hash, current_output_hash) &&
+    identical(run$approval_binding, run$binding)
+}
+
+
 can_release <- function(run, config = NULL) {
   if (!inherits(run, "DeidRun")) {
     return(FALSE)
@@ -200,7 +223,7 @@ can_release <- function(run, config = NULL) {
     is.data.frame(run$blockers) &&
     nrow(run$blockers) == 0L &&
     binding_complete &&
-    identical(run$approval_binding, run$binding)
+    release_binding_is_current(run)
 }
 
 

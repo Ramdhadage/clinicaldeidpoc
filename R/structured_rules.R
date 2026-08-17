@@ -29,12 +29,16 @@ parse_supported_dob <- function(value) {
     )
   ) {
     date_part <- sub(" .*", "", value)
-    year_format <- if (grepl("-[0-9]{2}$", date_part, perl = TRUE)) {
-      "%d-%b-%y"
+    if (grepl("-[0-9]{2}$", date_part, perl = TRUE)) {
+      year <- sub(".*-", "", date_part)
+      date_prefix <- sub("[0-9]{2}$", "", date_part)
+      candidates <- c(
+        safe_as_date(paste0(date_prefix, "19", year), "%d-%b-%Y"),
+        safe_as_date(paste0(date_prefix, "20", year), "%d-%b-%Y")
+      )
     } else {
-      "%d-%b-%Y"
+      candidates <- safe_as_date(date_part, "%d-%b-%Y")
     }
-    candidates <- safe_as_date(date_part, year_format)
   } else if (
     grepl(
       "^[0-9]{1,2}[-/][0-9]{1,2}[-/][0-9]{4}( ([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?)?$",
@@ -87,7 +91,8 @@ generalize_dob_value <- function(value, reference_date, age_90_plus_value) {
 
   candidates <- parse_supported_dob(value)
 
-  if (any(candidates > reference_date)) {
+  candidates <- candidates[candidates <= reference_date]
+  if (length(candidates) == 0L) {
     deid_abort(
       code = "FUTURE_DOB",
       message = "DOB contains a future date.",
