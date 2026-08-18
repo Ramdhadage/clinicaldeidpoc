@@ -20,7 +20,7 @@ It currently:
 - Converts DOB to a four-digit year or **90+**.
 - Displays `[Name]` for Patient_Name and independent random eight-character lowercase hexadecimal values for nonmissing Record_No, MRN, and Patient_ID cells without restoring their source values.
 - Generates the structured ID tokens from secure random bytes once per run, rejects collisions, keeps them only in session memory, and regenerates them for a new run.
-- Applies ordered deterministic tags to selected narrative patterns, including known names and identifiers, dates, contact details, URLs, IP addresses, labeled codes, addresses, ZIP codes, and facilities.
+- Applies ordered deterministic transformations to selected narrative patterns, including known names and identifiers, dates, contact details, URLs, IP addresses, labeled codes, addresses, ZIP codes, and facilities.
 - Invalidates previous results whenever another file is uploaded.
 - Blocks every download/export because Azure free-text processing, complete validation, human review, and approval have not yet been implemented.
 
@@ -36,7 +36,7 @@ HHS defines 18 Safe Harbor identifier types. The requested list contains 20 oper
 |---|---|---|
 | Names | Known patient names and titled clinician names become [Name] | Partial |
 | Geographic subdivisions | Recognized addresses and selected location phrases become [Geographic Subdivision] | Partial |
-| ZIP codes | Full recognized ZIP becomes [ZIP Code]; no Census population decision is made | Conservative preview |
+| ZIP codes | Preserves an approved eligible three-digit prefix and changes the final two digits to 00; all other prefixes become 00000. ZIP+4 extensions are removed. The current policy has no approved Census allowlist, so every recognized ZIP becomes 00000. | Conditional rule implemented; default deny pending approved Census evidence |
 | Dates except year | Recognized valid dates become [YYYY] | Partial |
 | Ages over 89 | Structured DOB, DOB-context narrative dates, or explicit ages become [Age: 90 or older] | Partial |
 | Telephone numbers | Recognized North American and selected international formats become [Telephone Number] | Partial |

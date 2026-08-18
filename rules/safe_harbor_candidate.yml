@@ -1,5 +1,5 @@
 policy_id: "safe_harbor_candidate"
-policy_version: "0.3.0"
+policy_version: "0.4.0"
 status: "PROPOSED_REQUIRES_APPROVAL"
 profile: "safe_harbor_candidate"
 reference_date: "2026-08-12"
@@ -20,6 +20,11 @@ preview:
     alphabet: "lowercase_hex"
     source_derived: false
     persist: false
+  zip_code:
+    mode: "safe_harbor_conditional_three_digit"
+    eligible_three_digit_prefixes: []
+    population_source: "No approved current Census allowlist configured; default deny"
+    population_reference_date: "2026-08-18"
   failure_placeholder: "[REDACTION FAILED]"
   tags:
     name: "[Name]"

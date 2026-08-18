@@ -227,7 +227,7 @@ token_factory_from <- function(values) {
 run_test("configuration matches the locked milestone", {
   expect_true(inherits(config, "DeidConfig"))
   expect_identical(config$schema$schema_version, "0.2.0")
-  expect_identical(config$policy$policy_version, "0.3.0")
+  expect_identical(config$policy$policy_version, "0.4.0")
   expect_identical(config$schema$sheet_name, "Clinical_Data")
   expect_identical(config$runtime$mode, "synthetic_only")
   expect_false(config$runtime$release_enabled)
@@ -276,6 +276,14 @@ run_test("configuration rejects action drift", {
     validate_config_for_test(token_drift),
     "deid_config_error",
     "INVALID_STRUCTURED_PREVIEW_ID_CONFIGURATION"
+  )
+
+  zip_drift <- config
+  zip_drift$policy$preview$zip_code$eligible_three_digit_prefixes <- "44"
+  expect_deid_error(
+    validate_config_for_test(zip_drift),
+    "deid_config_error",
+    "INVALID_SAFE_HARBOR_ZIP_CONFIGURATION"
   )
 })
 
@@ -778,7 +786,7 @@ run_test("deterministic preview tags requested identifier examples", {
     "Patient ID: PT-001-ABC." = "[Other Unique Identifier]",
     "Biometric template: BIO-12345." = "[Biometric Identifier]",
     "Call 216-555-0188." = "[Telephone Number]",
-    "ZIP 44101." = "[ZIP Code]"
+    "ZIP 44101." = "ZIP 00000."
   )
   for (example in names(contextual_examples)) {
     tagged <- redact_narrative_for_test(example, config = config)
@@ -958,6 +966,26 @@ run_test("export is blocked and creates no file", {
     "EXPORT_NOT_APPROVED"
   )
   expect_false(file.exists(output_path))
+})
+
+
+run_test("ZIP preview applies the conditional three-digit exception", {
+  allowed_config <- config
+  allowed_config$policy$preview$zip_code$eligible_three_digit_prefixes <- "441"
+  validate_config_for_test(allowed_config)
+
+  expect_identical(
+    redact_narrative_for_test("ZIP 44101 and 05910.", config = allowed_config),
+    "ZIP 44100 and 00000."
+  )
+  expect_identical(
+    redact_narrative_for_test("ZIP 44101.", config = config),
+    "ZIP 00000."
+  )
+  expect_identical(
+    redact_narrative_for_test("ZIP 44101-1234.", config = allowed_config),
+    "ZIP 44100."
+  )
 })
 
 

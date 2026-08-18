@@ -184,6 +184,34 @@ validate_deid_config <- function(config) {
     )
   }
 
+  zip_code <- policy$preview$zip_code
+  eligible_prefixes <- unlist(
+    zip_code$eligible_three_digit_prefixes,
+    use.names = FALSE
+  )
+  if (
+    !is.list(zip_code) ||
+    !identical(zip_code$mode, "safe_harbor_conditional_three_digit") ||
+    !is.character(zip_code$population_source) ||
+    length(zip_code$population_source) != 1L ||
+    is.na(zip_code$population_source) ||
+    !nzchar(zip_code$population_source) ||
+    !is.character(zip_code$population_reference_date) ||
+    length(zip_code$population_reference_date) != 1L ||
+    is.na(as.Date(zip_code$population_reference_date)) ||
+    any(!grepl("^[0-9]{3}$", eligible_prefixes, perl = TRUE)) ||
+    anyDuplicated(eligible_prefixes)
+  ) {
+    deid_abort(
+      code = "INVALID_SAFE_HARBOR_ZIP_CONFIGURATION",
+      message = paste(
+        "The conditional three-digit ZIP policy must use an approved",
+        "unique three-digit Census allowlist."
+      ),
+      subclass = "deid_config_error"
+    )
+  }
+
   required_preview_tags <- c(
     "name",
     "geographic_subdivision",

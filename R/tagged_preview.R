@@ -543,6 +543,17 @@ birth_year_preview_tag <- function(year, config) {
 }
 
 
+safe_harbor_zip_preview_value <- function(value, config) {
+  prefix <- substr(value, 1L, 3L)
+  eligible_prefixes <- unlist(
+    config$policy$preview$zip_code$eligible_three_digit_prefixes,
+    use.names = FALSE
+  )
+  retained_prefix <- if (prefix %in% eligible_prefixes) prefix else "000"
+  paste0(retained_prefix, "00")
+}
+
+
 redact_narrative_text <- function(
     text,
     known_name = NA_character_,
@@ -905,10 +916,10 @@ redact_narrative_text <- function(
     address_pattern,
     preview_tag(config, "geographic_subdivision")
   )
-  buffer <- replace_regex_tag(
+  buffer <- replace_regex_callback(
     buffer,
     "(?<![0-9])[0-9]{5}(?:-[0-9]{4})?(?![0-9])",
-    preview_tag(config, "zip_code")
+    function(value) safe_harbor_zip_preview_value(value, config)
   )
 
   facility_pattern <- paste0(

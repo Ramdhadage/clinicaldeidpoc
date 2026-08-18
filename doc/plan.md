@@ -188,7 +188,7 @@ This is planning-level technical guidance, not legal advice. HHS describes both 
 | Identifier/category | Example | Structured-field handling | Free-text handling | Validation required | Residual-risk consideration |
 |---|---|---|---|---|---|
 | Names | Patient or relative name | Remove value | Local known-value scan plus Azure/local person detection | Normalized and alias matching | Initials, nicknames, partial names, clinician/patient ambiguity |
-| Geographic information | Street, city, county, ZIP | Retain state only; remove all smaller geography | Redact street/city/ZIP mentions | Address/ZIP regex and labelled review | Facility and rare-location combinations |
+| Geographic information | Street, city, county, ZIP | Retain state only; apply the conditional three-digit ZIP rule using approved current Census evidence | Redact street/city; transform recognized ZIPs to an allowed three-digit prefix plus 00, otherwise 00000 | Address/ZIP regex, allowlist provenance, and labelled review | Facility and rare-location combinations |
 | Dates except year | DOB, admission date | Parse format-aware; retain year only | Replace month/day/time while retaining approved year | Date parser plus labelled spans | Ages over 89 and temporal combinations |
 | Telephone numbers | 617-555-0142 | Remove | Regex plus Azure detection | Digits-only normalized scan | International formats and extensions |
 | Fax numbers | Fax field/mention | Remove | Regex plus Azure detection | Pattern variants | Misclassified phone/fax |
@@ -209,7 +209,7 @@ This is planning-level technical guidance, not legal advice. HHS describes both 
 Additional policy rules:
 
 - Age 90 or older will be represented as 90+; birth-year information that reveals an age over 89 will be suppressed or generalized.
-- The PoC will not use the conditional three-digit ZIP exception; all ZIP codes will be removed.
+- The PoC implements the conditional three-digit ZIP rule with a versioned, default-deny allowlist. A ZIP prefix is retained only when an approved current Census evidence record confirms that the combined geographic unit for the prefix has more than 20,000 people; otherwise the ZIP becomes 00000. No allowlist is currently approved, so the synthetic preview defaults to 00000 for every recognized ZIP.
 - Removal, masking, generalization, and typed replacement are acceptable transformation mechanisms only when validation proves that the identifying value is unavailable.
 - Tokenization or pseudonymization preserves linkage and is not automatically equivalent to de-identification. It is excluded from the released PoC profile.
 - Supplementary quasi-identifier uniqueness checks may identify risky combinations, but will not be presented as Expert Determination.
@@ -779,3 +779,40 @@ Repository controls:
    - Approve acceptance thresholds, reviewers, segregation of duties, release criteria, and residual-risk authority.
 
 8. **First implementation milestone after approval:** complete Phase 0, then build a non-releasing deterministic foundation that validates Clinical_Data, implements the seven-column structured policy, resets state correctly, blocks raw/partial export, and passes the synthetic regression suite. Azure integration and approved-PHI execution begin only after that milestone and the corresponding security gate pass.
+
+## 21. Implementation Progress Tracker
+
+This tracker records observed implementation evidence. It does not grant governance approval, authorize PHI processing, or change the non-releasing status of the PoC.
+
+**Last reviewed:** 2026-08-18
+**Scope reviewed:** Milestone 1.2 synthetic-only application, `doc/run-guide.md`, configuration, core tests, and Shiny server tests.
+
+| Plan area | Status | Current evidence | Remaining gate / next action |
+|---|---|---|---|
+| Phase 0 — Governance/environment approval | Blocked | No organization approvals, approved-PHI evidence, Azure authorization, or controlled hosting evidence is recorded in this repository. | Obtain the required privacy, security, platform, Azure, retention, and reviewer approvals before any PHI or Azure work. |
+| Phase 1 — Baseline and contracts | In progress | Exact `Clinical_Data` seven-column contract and versioned candidate rules are present; `renv.lock` targets R 4.5.2. | Restore and record the R 4.5.2 controlled baseline, or formally rebuild the lockfile and rerun the regression baseline. |
+| Phase 2 — Structured engine | Demonstrated for synthetic data | Strict XLSX/schema checks, deterministic structured transformations, state invalidation, preview-token safeguards, default-deny conditional ZIP handling, and fail-closed export are implemented. Core suite: 28/28 passed on 2026-08-18. | Obtain approval of the rule catalogue and retain formal validation evidence before treating this phase as approved. |
+| Phase 3 — Azure integration | Not started | `azure.enabled: false`; no Azure adapter, identity flow, or approved connectivity evidence. | Implement mocked adapter and security controls only after Phase 0 approval. |
+| Phase 4 — Validation/evaluation | Not started | The application intentionally reports `NARRATIVE_REDACTION_NOT_VALIDATED`; no approved-PHI corpus, annotations, holdout, or threshold report exists. | Define annotation and residual-PHI evaluation workflow, then validate against approved data. |
+| Phase 5 — Logging/traceability | Not started | No sanitized persistent audit manifest or reconstruction evidence was reviewed. | Implement approved evidence schema, sanitization, retention, and reconstruction test. |
+| Phase 6 — Human review | Not started | No RBAC, exception queue, decision capture, or independent approval workflow is implemented. | Design and test role separation and approval binding. |
+| Phase 7 — PoC execution | Blocked | The UI banner, configuration, and export guard keep the application synthetic-only and non-releasing. Shiny safety suite passed on 2026-08-17. | Do not run PHI until every preceding gate is complete and approved. |
+
+### Review Follow-ups
+
+- [ ] Obtain, version, and approve the current Census three-digit ZIP population allowlist before any eligible prefix is retained; the default-deny policy currently transforms every recognized ZIP to 00000.
+- [ ] Reconcile the controlled R baseline: R 4.6.0 executed the current tests, but the loaded packages reported build version 4.6.1 while `renv.lock` targets R 4.5.2.
+- [ ] Decide whether additional workbook sheets must be rejected or explicitly recorded. The plan calls for additional sheets to be flagged; `config/schema.yml` currently permits them.
+- [ ] Preserve the synthetic-only, non-releasing gate until Azure free-text processing, residual-PHI validation, human review, and formal approval evidence exist.
+
+### Verification Log
+
+| Date | Check | Result |
+|---|---|---|
+| 2026-08-17 | `scripts/check-environment.R` | Passed for core dependencies using R 4.6.0. |
+| 2026-08-17 | `scripts/check-environment.R --app` | Passed for core and Shiny dependencies using R 4.6.0. |
+| 2026-08-17 | `tests/run-core-tests.R` | Passed: 27 tests, 0 failures. |
+| 2026-08-17 | `tests/run-app-tests.R` | Passed: Shiny milestone safety tests. |
+| 2026-08-17 | `scripts/run-sample.R` | Completed with `PROCESSED`, release disabled, and two narrative-validation blockers. |
+| 2026-08-18 | `tests/run-core-tests.R` | Passed: 28 tests, 0 failures, including conditional three-digit ZIP behavior. |
+| 2026-08-18 | `tests/run-app-tests.R` | Passed: Shiny milestone safety tests. |
