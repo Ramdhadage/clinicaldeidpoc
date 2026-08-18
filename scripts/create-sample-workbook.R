@@ -5,7 +5,7 @@ load_deid_modules(".")
 target_directory <- file.path("runtime", "input")
 target_path <- file.path(
   target_directory,
-  "Clinical_PHI_Anonymization_Data.xlsx"
+  "Clinical_PHI_Anonymization_Data_v0.3.xlsx"
 )
 
 if (file.exists(target_path)) {
@@ -33,6 +33,7 @@ data <- data.frame(
   ),
   MRN = c("SYN-MRN-001", "SYN-MRN-002"),
   Patient_ID = c("SYN-001", "SYN-002"),
+  Zip_Code = c("44101", "05910"),
   stringsAsFactors = FALSE,
   check.names = FALSE
 )

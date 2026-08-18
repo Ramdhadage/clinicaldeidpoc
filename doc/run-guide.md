@@ -68,6 +68,7 @@ Official reference: [HHS de-identification guidance](https://www.hhs.gov/hipaa/f
 | config/poc.yml | Synthetic-only runtime controls |
 | rules/safe_harbor_candidate.yml | Proposed structured transformation policy |
 | R/ | Modular input, schema, transformation, validation, workflow, UI, and export-guard functions |
+| R/azure_pii_client.R | Disabled-by-default Azure Text PII LRO request, poll, retry, and response-validation contract |
 | tests/run-core-tests.R | Core regression and fail-closed tests |
 | tests/run-app-tests.R | Shiny server/state safety tests |
 | scripts/create-sample-workbook.R | Generates a small synthetic XLSX fixture with the required contract |
@@ -125,7 +126,7 @@ Run the core workbook, schema, transformation, state, and export-gate tests:
 
 Expected result:
 
-    Tests run: 30
+    Tests run: 34
     Failures: 0
     All core milestone tests passed.
 
@@ -141,11 +142,11 @@ These tests use synthetic data and temporary XLSX files. They make no Azure or e
 
 ## 7. Create or Confirm the Generated Sample XLSX Workbook
 
-The application does not accept CSV directly. The CLI demonstration deliberately uses only the generated synthetic fixture at `runtime/input/Clinical_PHI_Anonymization_Data.xlsx`; it never selects a user-provided workbook from the project root.
+The application does not accept CSV directly. The CLI demonstration deliberately uses only the generated synthetic fixture at `runtime/input/Clinical_PHI_Anonymization_Data_v0.3.xlsx`; it never selects a user-provided workbook from the project root. The versioned file name avoids overwriting an older generated fixture that predates the required `Zip_Code` column.
 
 Confirm whether the generated fixture exists:
 
-    Test-Path -LiteralPath "runtime/input/Clinical_PHI_Anonymization_Data.xlsx"
+    Test-Path -LiteralPath "runtime/input/Clinical_PHI_Anonymization_Data_v0.3.xlsx"
 
 If the result is `False`, create it:
 
@@ -193,7 +194,7 @@ To stop the app, return to PowerShell and press **Ctrl+C**.
 1. Confirm that the red banner says **Synthetic demonstration only**.
 2. Select the generated fixture (or another workbook whose synthetic provenance has been confirmed):
 
-       runtime/input/Clinical_PHI_Anonymization_Data.xlsx
+       runtime/input/Clinical_PHI_Anonymization_Data_v0.3.xlsx
 
 3. Select **I confirm this workbook contains synthetic test data only**.
 4. Select **Generate tagged preview**.
@@ -276,7 +277,7 @@ Remove the unknown column from the test workbook or add it only through a formal
 
 The following are intentionally not implemented in Milestone 1.2:
 
-- Azure AI Language Text PII integration
+- Live Azure AI Language Text PII connectivity, Entra workload identity, and private-network integration
 - Validated Azure/NER narrative detection and redaction
 - Complete residual-PHI validation
 - Enterprise SSO and role-based access
@@ -286,6 +287,8 @@ The following are intentionally not implemented in Milestone 1.2:
 - Releasable output
 - Organization-confirmed Azure, security, privacy, contractual, and retention controls
 
-The next technical milestone is the Azure free-text adapter, residual-identifier evaluation, and reviewed rule coverage, using mocked responses first and no real PHI until Phase 0 governance approval is complete.
+The first Phase 3 foundation is implemented but remains disabled: `R/azure_pii_client.R` builds the reviewed GA `2026-05-01` Text PII long-running-job request, requires `loggingOptOut=true`, submits through an injected transport, validates the same-origin `Operation-Location`, polls terminal state, retries transient failures, and validates exact returned model/document/entity spans. The automated tests use synthetic mocked responses only; no live Azure request, credential, or PHI was used.
+
+The next technical work is bounded chunking and offset maps, an approved Entra workload-identity provider, private-connectivity validation, and synthetic connectivity evidence. Do not enable `azure.enabled`, provide an endpoint, or call the client against Azure until Phase 0 governance approval is complete.
 
 Before publishing the project as an R package, replace the placeholder maintainer email in DESCRIPTION with an approved organizational contact.

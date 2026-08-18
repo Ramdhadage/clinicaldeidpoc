@@ -3,7 +3,13 @@ mode: "synthetic_only"
 release_enabled: false
 azure:
   enabled: false
+  api_version: "2026-05-01"
+  model_version: "2026-05-01"
+  request_timeout_seconds: 60
+  max_attempts: 3
+  initial_retry_seconds: 1
+  max_poll_attempts: 60
+  poll_interval_seconds: 1
 limits:
   max_file_bytes: 10485760
   max_rows: 10000
-

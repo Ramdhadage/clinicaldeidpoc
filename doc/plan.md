@@ -22,7 +22,7 @@ Implementation status as of 2026-08-16:
 - Milestone 1.2, the synthetic-only structured-data foundation with run-scoped hexadecimal ID tokens and a deterministic narrative preview, is implemented.
 - The exact Clinical_Data schema, deterministic identifier removal, DOB generalization, source-independent token generation, collision rejection, state invalidation, and server-side export guard have automated test evidence.
 - The tagged preview covers known values and selected deterministic patterns, but it is not validated for residual identifiers and is not a Safe Harbor determination.
-- Azure/NER text processing, complete residual validation, enterprise controls, human approval, and release remain unimplemented and blocking.
+- The Azure Text PII LRO client contract is implemented and covered by synthetic mocked-response tests. Live Azure connectivity, Entra workload identity, chunking, residual validation, enterprise controls, human approval, and release remain unimplemented and blocking.
 - See [the step-by-step run guide](run-guide.md) for verified commands and current limitations.
 
 ## 1. PoC Objective
@@ -138,7 +138,7 @@ Component responsibilities:
 | Column classifier | Assign each field to direct identifier, quasi-identifier, free text, non-sensitive, or unresolved |
 | Structured engine | Apply typed, deterministic transformations based on a versioned rule catalogue |
 | Known-value scanner | Temporarily derive normalized variants of structured identifiers and redact matches in narratives before Azure submission |
-| Azure adapter | Batch synchronous REST calls, authenticate with Entra ID, validate responses, retry transient failures, and return normalized detections |
+| Azure adapter | Submit bounded Text PII REST jobs, authenticate with Entra ID, validate `Operation-Location` polling and responses, retry transient failures, and return normalized detections |
 | Reconciliation engine | Combine local and Azure spans, resolve overlaps deterministically, and apply replacements from right to left |
 | Validation engine | Check residual identifiers, schema integrity, clinical preservation, completeness, and release gates |
 | Review workflow | Expose only necessary original/redacted snippets to authorized reviewers and capture reason-coded decisions |
@@ -219,8 +219,8 @@ Additional policy rules:
 Planned Azure integration:
 
 - Service: Azure AI Language Text PII.
-- API: synchronous POST {Endpoint}/language/:analyze-text.
-- Pinned GA api-version=2026-05-01 and modelVersion=2026-05-01; preview capabilities excluded. [Model lifecycle](https://learn.microsoft.com/en-us/azure/ai-services/language-service/concepts/model-lifecycle) and [REST reference](https://learn.microsoft.com/en-us/rest/api/language/analyze-text/analyze-text/analyze-text?view=rest-language-analyze-text-2026-05-01) (accessed 2026-08-11).
+- API: long-running Text PII jobs: POST `{Endpoint}/language/analyze-text/jobs?api-version=2026-05-01` must return HTTP 202 and a same-origin `Operation-Location`; the adapter then polls that URL until the job is terminal.
+- Pinned GA api-version=2026-05-01 and modelVersion=2026-05-01; preview capabilities excluded. [Model lifecycle](https://learn.microsoft.com/en-us/azure/ai-services/language-service/concepts/model-lifecycle) and [REST reference](https://learn.microsoft.com/en-us/rest/api/language/analyze-text/analyze-text-submit-job/analyze-text-submit-job?view=rest-language-analyze-text-2026-05-01) (accessed 2026-08-18).
 - Full PII category coverage rather than domain=phi, because domain=phi is only a service category subset and is not Safe Harbor assurance.
 - disableEntityValidation=false.
 - loggingOptOut=true explicitly on every request.
@@ -779,21 +779,21 @@ Repository controls:
    - Approve the rule catalogue, including dates, ages over 89, clinician/facility handling, quasi-identifiers, and no cross-run linkage.
    - Approve acceptance thresholds, reviewers, segregation of duties, release criteria, and residual-risk authority.
 
-8. **First implementation milestone after approval:** complete Phase 0, then build a non-releasing deterministic foundation that validates Clinical_Data, implements the eight-column structured policy, resets state correctly, blocks raw/partial export, and passes the synthetic regression suite. Azure integration and approved-PHI execution begin only after that milestone and the corresponding security gate pass.
+8. **First implementation milestone after approval:** complete Phase 0, then build a non-releasing deterministic foundation that validates Clinical_Data, implements the eight-column structured policy, resets state correctly, blocks raw/partial export, and passes the synthetic regression suite. Synthetic Azure request/response contract tests may run with mocked data while Azure remains disabled. Live Azure connectivity and approved-PHI execution begin only after that milestone and the corresponding security gate pass.
 
 ## 21. Implementation Progress Tracker
 
 This tracker records observed implementation evidence. It does not grant governance approval, authorize PHI processing, or change the non-releasing status of the PoC.
 
 **Last reviewed:** 2026-08-18
-**Scope reviewed:** Milestone 1.2 synthetic-only application, `doc/run-guide.md`, configuration, core tests, and Shiny server tests.
+**Scope reviewed:** Milestone 1.2 synthetic-only application, Azure Text PII GA REST contract, `doc/run-guide.md`, generated sample workflow, configuration, core tests, and Shiny server tests.
 
 | Plan area | Status | Current evidence | Remaining gate / next action |
 |---|---|---|---|
 | Phase 0 — Governance/environment approval | Blocked | No organization approvals, approved-PHI evidence, Azure authorization, or controlled hosting evidence is recorded in this repository. | Obtain the required privacy, security, platform, Azure, retention, and reviewer approvals before any PHI or Azure work. |
 | Phase 1 — Baseline and contracts | In progress | Exact `Clinical_Data` eight-column contract, including `Zip_Code`, and versioned candidate rules are present; `renv.lock` targets R 4.5.2. | Restore and record the R 4.5.2 controlled baseline, or formally rebuild the lockfile and rerun the regression baseline. |
 | Phase 2 — Structured engine | Demonstrated for synthetic data | Strict XLSX/schema checks, deterministic structured transformations, state invalidation, preview-token safeguards, default-deny conditional ZIP handling, verified synthetic-preview download, and fail-closed release export are implemented. Core suite: 31/31 passed on 2026-08-18. | Obtain approval of the rule catalogue and retain formal validation evidence before treating this phase as approved. |
-| Phase 3 — Azure integration | Not started | `azure.enabled: false`; no Azure adapter, identity flow, or approved connectivity evidence. | Implement mocked adapter and security controls only after Phase 0 approval. |
+| Phase 3 — Azure integration | In progress — synthetic contract only | `azure.enabled: false`; `R/azure_pii_client.R` submits/polls the reviewed 2026-05-01 LRO contract through an injected transport, validates the same-origin `Operation-Location`, retries transient failures, and validates exact returned model/document/entity spans. Core suite: 34/34 passed using synthetic mocks; no Azure request, credential, or PHI was used. | Implement bounded chunking, an approved Entra workload-identity provider, private connectivity, and synthetic connectivity evidence only after Phase 0 approval. |
 | Phase 4 — Validation/evaluation | Not started | The application intentionally reports `NARRATIVE_REDACTION_NOT_VALIDATED`; no approved-PHI corpus, annotations, holdout, or threshold report exists. | Define annotation and residual-PHI evaluation workflow, then validate against approved data. |
 | Phase 5 — Logging/traceability | Not started | No sanitized persistent audit manifest or reconstruction evidence was reviewed. | Implement approved evidence schema, sanitization, retention, and reconstruction test. |
 | Phase 6 — Human review | Not started | No RBAC, exception queue, decision capture, or independent approval workflow is implemented. | Design and test role separation and approval binding. |
@@ -805,6 +805,7 @@ This tracker records observed implementation evidence. It does not grant governa
 - [ ] Reconcile the controlled R baseline: R 4.6.0 executed the current tests, but the loaded packages reported build version 4.6.1 while `renv.lock` targets R 4.5.2.
 - [ ] Decide whether additional workbook sheets must be rejected or explicitly recorded. The plan calls for additional sheets to be flagged; `config/schema.yml` currently permits them.
 - [ ] Preserve the synthetic-only, non-releasing gate until Azure free-text processing, residual-PHI validation, human review, and formal approval evidence exist.
+- [ ] Confirm the resource supports the reviewed GA LRO endpoint before any connectivity test. The former synchronous endpoint is not the 2026-05-01 contract; retain the exact API/model version in the configuration register and run evidence.
 
 ### Verification Log
 
@@ -822,3 +823,7 @@ This tracker records observed implementation evidence. It does not grant governa
 | 2026-08-18 | Uploaded workbook ZIP verification | `Clinical_PHI_Anonymization_Data.xlsx` processed with three-digit `Zip_Code` output (`000` by default). |
 | 2026-08-18 | Synthetic tagged-preview XLSX download | Implemented as a synthetic-only, non-releasable preview artifact with an explicit notice sheet; it does not alter the release gate. |
 | 2026-08-18 | Uploaded workbook preview-download verification | Generated a two-sheet synthetic preview XLSX successfully; the run remained `PROCESSED` and release remained blocked. |
+| 2026-08-18 | Azure Text PII contract review | Corrected the Phase 3 adapter design to the GA LRO contract: submit to `/language/analyze-text/jobs`, require HTTP 202 plus same-origin `Operation-Location`, then poll to a terminal state. No live request was made. |
+| 2026-08-18 | `scripts/check-environment.R --app` | Passed with `curl` 7.1.0 and `jsonlite` 2.0.0 added as direct runtime dependencies; existing packages load under R 4.6.0 (build-version warnings remain). |
+| 2026-08-18 | `tests/run-core-tests.R` | Passed: 34 tests, 0 failures, including synthetic Azure LRO payload, poll, retry, same-origin URL, model/document/span, and disabled-runtime tests. |
+| 2026-08-18 | `scripts/create-sample-workbook.R` and `scripts/run-sample.R` | Created and processed the non-overwriting `Clinical_PHI_Anonymization_Data_v0.3.xlsx` fixture successfully: `PROCESSED`, two narrative-validation blockers, and release disabled. |

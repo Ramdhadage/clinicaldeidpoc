@@ -138,6 +138,45 @@ validate_deid_config <- function(config) {
     )
   }
 
+  azure <- runtime$azure
+  if (
+    !is.list(azure) ||
+    !identical(azure$enabled, FALSE) ||
+    !identical(azure$api_version, "2026-05-01") ||
+    !identical(azure$model_version, "2026-05-01") ||
+    length(azure$request_timeout_seconds) != 1L ||
+    is.na(azure$request_timeout_seconds) ||
+    !is.numeric(azure$request_timeout_seconds) ||
+    azure$request_timeout_seconds <= 0 ||
+    length(azure$max_attempts) != 1L ||
+    is.na(azure$max_attempts) ||
+    !is.numeric(azure$max_attempts) ||
+    azure$max_attempts < 1 ||
+    azure$max_attempts != as.integer(azure$max_attempts) ||
+    length(azure$initial_retry_seconds) != 1L ||
+    is.na(azure$initial_retry_seconds) ||
+    !is.numeric(azure$initial_retry_seconds) ||
+    azure$initial_retry_seconds < 0 ||
+    length(azure$max_poll_attempts) != 1L ||
+    is.na(azure$max_poll_attempts) ||
+    !is.numeric(azure$max_poll_attempts) ||
+    azure$max_poll_attempts < 1 ||
+    azure$max_poll_attempts != as.integer(azure$max_poll_attempts) ||
+    length(azure$poll_interval_seconds) != 1L ||
+    is.na(azure$poll_interval_seconds) ||
+    !is.numeric(azure$poll_interval_seconds) ||
+    azure$poll_interval_seconds < 0
+  ) {
+    deid_abort(
+      code = "INVALID_AZURE_CONFIGURATION",
+      message = paste(
+        "Azure must remain disabled and use the reviewed 2026-05-01",
+        "synthetic-test configuration."
+      ),
+      subclass = "deid_config_error"
+    )
+  }
+
   reference_date <- as.Date(policy$reference_date)
   if (is.na(reference_date)) {
     deid_abort(

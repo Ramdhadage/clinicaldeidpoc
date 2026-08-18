@@ -6,7 +6,7 @@ config <- read_deid_config(".")
 source_path <- file.path(
   "runtime",
   "input",
-  "Clinical_PHI_Anonymization_Data.xlsx"
+  "Clinical_PHI_Anonymization_Data_v0.3.xlsx"
 )
 
 if (!file.exists(source_path)) {

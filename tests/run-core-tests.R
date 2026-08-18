@@ -210,6 +210,14 @@ verify_release_workbook_for_test <- internal_function_for_test(
 build_validation_summary_for_test <- internal_function_for_test(
   "build_validation_summary_sheet"
 )
+build_azure_pii_job_for_test <- internal_function_for_test("build_azure_pii_job")
+new_azure_pii_client_for_test <- internal_function_for_test("new_azure_pii_client")
+new_configured_azure_pii_client_for_test <- internal_function_for_test(
+  "new_configured_azure_pii_client"
+)
+analyze_azure_pii_batch_for_test <- internal_function_for_test(
+  "analyze_azure_pii_batch"
+)
 write_synthetic_preview_workbook_for_test <- internal_function_for_test(
   "write_synthetic_preview_workbook"
 )
@@ -1224,6 +1232,274 @@ run_test("forged approval cannot bypass the milestone export gate", {
     "EXPORT_NOT_APPROVED"
   )
   expect_false(file.exists(output_path))
+})
+
+
+run_test("Azure PII configuration remains disabled in the synthetic runtime", {
+  expect_deid_error(
+    new_configured_azure_pii_client_for_test(
+      config = config,
+      endpoint = "https://example.cognitiveservices.azure.com",
+      token_provider = function() "synthetic-token"
+    ),
+    "deid_governance_error",
+    "AZURE_PROCESSING_DISABLED"
+  )
+
+  changed <- config
+  changed$runtime$azure$enabled <- TRUE
+  expect_deid_error(
+    validate_config_for_test(changed),
+    "deid_config_error",
+    "INVALID_AZURE_CONFIGURATION"
+  )
+})
+
+
+run_test("Azure PII client submits and polls a validated synthetic LRO response", {
+  endpoint <- "https://example.cognitiveservices.azure.com"
+  source_text <- paste0(intToUtf8(0x1F600), " Jane Doe")
+  redacted_text <- paste0(intToUtf8(0x1F600), " [Person]")
+  operation_url <- paste0(
+    endpoint,
+    "/language/analyze-text/jobs/11111111-1111-1111-1111-111111111111",
+    "?api-version=2026-05-01"
+  )
+  state <- new.env(parent = emptyenv())
+  state$responses <- list(
+    list(
+      status_code = 202L,
+      headers = list(`Operation-Location` = operation_url),
+      body = ""
+    ),
+    list(
+      status_code = 200L,
+      headers = list(),
+      body = jsonlite::toJSON(
+        list(status = "running"),
+        auto_unbox = TRUE
+      )
+    ),
+    list(
+      status_code = 200L,
+      headers = list(),
+      body = jsonlite::toJSON(
+        list(
+          status = "succeeded",
+          tasks = list(items = list(list(
+            kind = "PiiEntityRecognitionLROResults",
+            taskName = "clinical-deidentification-pii",
+            status = "succeeded",
+            results = list(
+              modelVersion = "2026-05-01",
+              documents = list(list(
+                id = "note-1",
+                redactedText = redacted_text,
+                entities = list(list(
+                  text = "Jane Doe",
+                  category = "Person",
+                  type = "Person",
+                  offset = 2L,
+                  length = 8L,
+                  confidenceScore = 0.99
+                ))
+              )),
+              errors = list()
+            )
+          )))
+        ),
+        auto_unbox = TRUE
+      )
+    )
+  )
+  state$requests <- list()
+  state$sleeps <- numeric()
+  transport <- function(request) {
+    state$requests[[length(state$requests) + 1L]] <- request
+    state$responses[[length(state$requests)]]
+  }
+  sleep_function <- function(seconds) {
+    state$sleeps <- c(state$sleeps, seconds)
+  }
+  client <- new_azure_pii_client_for_test(
+    endpoint = endpoint,
+    token_provider = function() "synthetic-token",
+    request_transport = transport,
+    sleep_function = sleep_function,
+    poll_interval_seconds = 0
+  )
+  documents <- data.frame(
+    id = "note-1",
+    text = source_text,
+    stringsAsFactors = FALSE
+  )
+
+  payload <- build_azure_pii_job_for_test(client, documents)
+  parameters <- payload$tasks[[1]]$parameters
+  expect_identical(parameters$domain, "none")
+  expect_identical(parameters$disableEntityValidation, FALSE)
+  expect_identical(parameters$loggingOptOut, TRUE)
+  expect_identical(parameters$modelVersion, "2026-05-01")
+  expect_identical(parameters$stringIndexType, "UnicodeCodePoint")
+  expect_identical(parameters$piiCategories, list("All"))
+  expect_identical(
+    parameters$redactionPolicies[[1]]$policyKind,
+    "entityMask"
+  )
+
+  result <- analyze_azure_pii_batch_for_test(client, documents)
+  expect_identical(result$model_version, "2026-05-01")
+  expect_identical(result$documents$redacted_text, redacted_text)
+  expect_identical(result$entities$text, "Jane Doe")
+  expect_identical(result$entities$offset, 2L)
+  expect_identical(result$entities$length, 8L)
+  expect_identical(length(state$requests), 3L)
+  expect_identical(state$requests[[1]]$method, "POST")
+  expect_identical(state$requests[[2]]$method, "GET")
+  expect_identical(state$requests[[1]]$headers[["Content-Type"]], "application/json")
+  submitted_payload <- jsonlite::fromJSON(
+    state$requests[[1]]$body,
+    simplifyVector = FALSE
+  )
+  expect_identical(
+    submitted_payload$tasks[[1]]$parameters$loggingOptOut,
+    TRUE
+  )
+  expect_identical(
+    submitted_payload$analysisInput$documents[[1]]$text,
+    source_text
+  )
+  expect_identical(state$sleeps, 0)
+})
+
+
+run_test("Azure PII client retries transient failures and rejects unsafe responses", {
+  endpoint <- "https://example.cognitiveservices.azure.com"
+  operation_url <- paste0(
+    endpoint,
+    "/language/analyze-text/jobs/22222222-2222-2222-2222-222222222222",
+    "?api-version=2026-05-01"
+  )
+  state <- new.env(parent = emptyenv())
+  state$responses <- list(
+    list(status_code = 429L, headers = list(`Retry-After` = "0"), body = ""),
+    list(
+      status_code = 202L,
+      headers = list(`Operation-Location` = operation_url),
+      body = ""
+    ),
+    list(
+      status_code = 200L,
+      headers = list(),
+      body = jsonlite::toJSON(
+        list(
+          status = "succeeded",
+          tasks = list(items = list(list(
+            kind = "PiiEntityRecognitionLROResults",
+            taskName = "clinical-deidentification-pii",
+            status = "succeeded",
+            results = list(
+              modelVersion = "2026-05-01",
+              documents = list(list(
+                id = "note-1",
+                redactedText = "No identifier.",
+                entities = list()
+              )),
+              errors = list()
+            )
+          )))
+        ),
+        auto_unbox = TRUE
+      )
+    )
+  )
+  state$requests <- list()
+  state$sleeps <- numeric()
+  client <- new_azure_pii_client_for_test(
+    endpoint = endpoint,
+    token_provider = function() "synthetic-token",
+    request_transport = function(request) {
+      state$requests[[length(state$requests) + 1L]] <- request
+      state$responses[[length(state$requests)]]
+    },
+    sleep_function = function(seconds) {
+      state$sleeps <- c(state$sleeps, seconds)
+    },
+    initial_retry_seconds = 0.5
+  )
+  result <- analyze_azure_pii_batch_for_test(
+    client,
+    data.frame(
+      id = "note-1",
+      text = "No identifier.",
+      stringsAsFactors = FALSE
+    )
+  )
+  expect_identical(nrow(result$entities), 0L)
+  expect_identical(length(state$requests), 3L)
+  expect_identical(state$sleeps, 0)
+
+  unsafe_client <- new_azure_pii_client_for_test(
+    endpoint = endpoint,
+    token_provider = function() "synthetic-token",
+    request_transport = function(request) {
+      list(
+        status_code = 202L,
+        headers = list(
+          `Operation-Location` = paste0(
+            "https://untrusted.example.invalid/language/analyze-text/jobs/",
+            "33333333-3333-3333-3333-333333333333?api-version=2026-05-01"
+          )
+        ),
+        body = ""
+      )
+    },
+    sleep_function = function(seconds) invisible(seconds)
+  )
+  expect_deid_error(
+    analyze_azure_pii_batch_for_test(
+      unsafe_client,
+      data.frame(
+        id = "note-1",
+        text = "No identifier.",
+        stringsAsFactors = FALSE
+      )
+    ),
+    "deid_azure_error",
+    "INVALID_AZURE_OPERATION_LOCATION"
+  )
+
+  malformed_client <- new_azure_pii_client_for_test(
+    endpoint = endpoint,
+    token_provider = function() "synthetic-token",
+    request_transport = function(request) {
+      if (identical(request$method, "POST")) {
+        return(list(
+          status_code = 202L,
+          headers = list(`Operation-Location` = operation_url),
+          body = ""
+        ))
+      }
+      list(
+        status_code = 200L,
+        headers = list(),
+        body = jsonlite::toJSON(list(tasks = list(items = list())), auto_unbox = TRUE)
+      )
+    },
+    sleep_function = function(seconds) invisible(seconds)
+  )
+  expect_deid_error(
+    analyze_azure_pii_batch_for_test(
+      malformed_client,
+      data.frame(
+        id = "note-1",
+        text = "No identifier.",
+        stringsAsFactors = FALSE
+      )
+    ),
+    "deid_azure_error",
+    "INVALID_AZURE_JOB_STATUS"
+  )
 })
 
 

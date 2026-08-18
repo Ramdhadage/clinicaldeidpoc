@@ -22,8 +22,10 @@ RoxygenNote: 7.3.3
 Depends:
     R (>= 4.5.2)
 Imports:
+    curl,
     digest,
     DT,
+    jsonlite,
     openssl,
     readxl,
     shiny,
@@ -40,6 +42,7 @@ Collate:
     'schema.R'
     'structured_rules.R'
     'tagged_preview.R'
+    'azure_pii_client.R'
     'validation.R'
     'workflow_state.R'
     'audit.R'
