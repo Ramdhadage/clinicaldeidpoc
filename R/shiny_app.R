@@ -76,6 +76,17 @@ build_deid_ui <- function(config) {
           )
         ),
         DT::DTOutput("tagged_preview"),
+        shiny::tags$h3("Detection details — deterministic preview only"),
+        shiny::tags$div(
+          class = "alert alert-info",
+          shiny::tags$strong("Azure is not called in this PoC. "),
+          paste(
+            "Detected entities and offsets below describe local preview tags",
+            "in the redacted preview text. Confidence scores are rule-based,",
+            "not Azure confidence scores."
+          )
+        ),
+        DT::DTOutput("detection_details"),
         shiny::uiOutput("synthetic_preview_download"),
         shiny::tags$h3("Critical validation blockers"),
         DT::DTOutput("blockers"),
@@ -277,6 +288,21 @@ build_deid_server <- function(config) {
           "download_synthetic_preview",
           "Download synthetic tagged preview (XLSX)",
           class = "btn-secondary"
+        )
+      )
+    })
+
+    output$detection_details <- DT::renderDT({
+      preview <- tagged_preview_value()
+      shiny::req(preview)
+
+      DT::datatable(
+        build_deterministic_detection_table(preview, config),
+        rownames = FALSE,
+        escape = TRUE,
+        options = list(
+          pageLength = 10,
+          scrollX = TRUE
         )
       )
     })

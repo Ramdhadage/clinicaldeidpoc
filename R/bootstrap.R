@@ -29,6 +29,7 @@ load_deid_modules <- function(
     "schema.R",
     "structured_rules.R",
     "tagged_preview.R",
+    "text_preprocessing.R",
     "azure_pii_client.R",
     "validation.R",
     "workflow_state.R",

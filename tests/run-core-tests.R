@@ -196,6 +196,17 @@ internal_function_for_test <- function(name) {
 redact_narrative_for_test <- internal_function_for_test(
   "redact_narrative_text"
 )
+chunk_prepared_text_for_test <- internal_function_for_test("chunk_prepared_text")
+prepare_free_text_for_azure_for_test <- internal_function_for_test(
+  "prepare_free_text_for_azure"
+)
+text_record_count_for_test <- internal_function_for_test("text_record_count")
+check_post_redaction_residuals_for_test <- internal_function_for_test(
+  "check_post_redaction_residuals"
+)
+build_deterministic_detection_table_for_test <- internal_function_for_test(
+  "build_deterministic_detection_table"
+)
 generalize_dob_for_test <- internal_function_for_test("generalize_dob_value")
 validate_config_for_test <- internal_function_for_test("validate_deid_config")
 generate_tokens_for_test <- internal_function_for_test(
@@ -1010,6 +1021,85 @@ run_test("export is blocked and creates no file", {
     "EXPORT_NOT_APPROVED"
   )
   expect_false(file.exists(output_path))
+})
+
+
+run_test("free-text preparation redacts known values before Azure and estimates records", {
+  data <- synthetic_fixture()[1:2, , drop = FALSE]
+  data$Diagnosis_Journey[[1]] <- paste(
+    "John Smith was referred with MRN-22222222 and SUBJ-002.",
+    "Contact john.smith@example.test."
+  )
+
+  preparation <- prepare_free_text_for_azure_for_test(data, config)
+
+  expect_identical(preparation$summary$documents, 4L)
+  expect_identical(
+    preparation$summary$estimated_original_text_records,
+    preparation$summary$estimated_text_records
+  )
+  expect_true(preparation$summary$estimated_text_records >= 1L)
+  expect_false(grepl(
+    "John Smith|MRN-22222222|SUBJ-002|john\\.smith@example\\.test",
+    paste(preparation$documents$text, collapse = " "),
+    perl = TRUE
+  ))
+})
+
+
+run_test("free-text chunk maps use Unicode codepoint offsets", {
+  text <- paste0(intToUtf8(0x1F600), "abcdef")
+  chunks <- chunk_prepared_text_for_test(
+    text,
+    maximum_codepoints = 3L,
+    overlap_codepoints = 1L
+  )
+
+  expect_identical(chunks$start_codepoint, c(0L, 2L, 4L, 6L))
+  expect_identical(chunks$end_codepoint, c(2L, 4L, 6L, 6L))
+  expect_identical(chunks$text[[1]], paste0(intToUtf8(0x1F600), "ab"))
+  expect_identical(text_record_count_for_test(strrep("a", 1000L)), 1L)
+  expect_identical(text_record_count_for_test(strrep("a", 1001L)), 2L)
+})
+
+
+run_test("post-redaction deterministic check flags remaining local matches", {
+  clean <- check_post_redaction_residuals_for_test(
+    "[Name] received therapy.",
+    config = config
+  )
+  remaining <- check_post_redaction_residuals_for_test(
+    "Contact john.smith@example.test.",
+    config = config
+  )
+
+  expect_false(clean$has_residual)
+  expect_true(remaining$has_residual)
+})
+
+
+run_test("deterministic detection table uses safe document IDs and preview offsets", {
+  preview <- synthetic_fixture()[1, , drop = FALSE]
+  preview$Diagnosis_Journey <- "[Name] contacted [Email]."
+  preview$Treatment_History <- "Treatment continued."
+
+  details <- build_deterministic_detection_table_for_test(preview, config)
+
+  expect_identical(
+    names(details),
+    c(
+      "document_id",
+      "detected_entities",
+      "offsets",
+      "confidence_scores",
+      "redacted_text"
+    )
+  )
+  expect_identical(details$document_id[[1]], "diagnosis_journey-000001")
+  expect_identical(details$detected_entities[[1]], "[Name], [Email]")
+  expect_identical(details$offsets[[1]], "0, 17")
+  expect_identical(details$confidence_scores[[1]], "Deterministic rule")
+  expect_identical(details$detected_entities[[2]], "No deterministic match")
 })
 
 

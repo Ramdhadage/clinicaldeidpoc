@@ -109,6 +109,7 @@ shiny::testServer(
 
     result_before <- processed$result$data
     preview <- create_tagged_preview(processed, config)
+    details <- build_deterministic_detection_table(preview, config)
     stopifnot(identical(
       preview$Diagnosis_Journey[[1]],
       "[Name] contacted [Email] from [IP Address]."
@@ -119,6 +120,16 @@ shiny::testServer(
     ))
     stopifnot(identical(preview$Patient_Name[[1]], "[Name]"))
     stopifnot(identical(preview$DOB[[1]], "[1980]"))
+    stopifnot(identical(
+      names(details),
+      c(
+        "document_id",
+        "detected_entities",
+        "offsets",
+        "confidence_scores",
+        "redacted_text"
+      )
+    ))
     id_columns <- c("Record_No", "MRN", "Patient_ID")
     preview_ids <- unlist(preview[id_columns], use.names = FALSE)
     stopifnot(all(grepl("^[0-9a-f]{8}$", preview_ids, perl = TRUE)))
@@ -164,6 +175,9 @@ stopifnot(grepl("Synthetic tagged preview", source_text, fixed = TRUE))
 stopifnot(grepl("not validated", source_text, fixed = TRUE))
 stopifnot(grepl("Dates are displayed as [YYYY]", source_text, fixed = TRUE))
 stopifnot(grepl("eight-character hexadecimal", source_text, fixed = TRUE))
+stopifnot(grepl("detection_details", source_text, fixed = TRUE))
+stopifnot(grepl("deterministic preview only", source_text, fixed = TRUE))
+stopifnot(grepl("Azure is not called", source_text, fixed = TRUE))
 stopifnot(grepl("held only in session memory", source_text, fixed = TRUE))
 stopifnot(!grepl("Safe structured preview", source_text, fixed = TRUE))
 stopifnot(!grepl("safe_preview", source_text, fixed = TRUE))
