@@ -8,7 +8,7 @@ It currently:
 
 - Accepts only an XLSX workbook.
 - Requires the exact worksheet name **Clinical_Data**.
-- Requires the seven approved columns:
+- Requires the eight approved columns:
   - **Record_No**
   - **Patient_Name**
   - **DOB**
@@ -16,8 +16,10 @@ It currently:
   - **Treatment_History**
   - **MRN**
   - **Patient_ID**
+  - **Zip_Code**
 - Removes all values from Record_No, Patient_Name, MRN, and Patient_ID.
 - Converts DOB to a four-digit year or **90+**.
+- Converts a valid U.S. Zip_Code to its approved three-digit prefix, or `000` when its prefix is not on the approved Census allowlist. Numeric postal values that cannot be unambiguously normalized to a U.S. ZIP are suppressed.
 - Displays `[Name]` for Patient_Name and independent random eight-character lowercase hexadecimal values for nonmissing Record_No, MRN, and Patient_ID cells without restoring their source values.
 - Generates the structured ID tokens from secure random bytes once per run, rejects collisions, keeps them only in session memory, and regenerates them for a new run.
 - Applies ordered deterministic transformations to selected narrative patterns, including known names and identifiers, dates, contact details, URLs, IP addresses, labeled codes, addresses, ZIP codes, and facilities.
@@ -36,7 +38,7 @@ HHS defines 18 Safe Harbor identifier types. The requested list contains 20 oper
 |---|---|---|
 | Names | Known patient names and titled clinician names become [Name] | Partial |
 | Geographic subdivisions | Recognized addresses and selected location phrases become [Geographic Subdivision] | Partial |
-| ZIP codes | Preserves an approved eligible three-digit prefix and changes the final two digits to 00; all other prefixes become 00000. ZIP+4 extensions are removed. The current policy has no approved Census allowlist, so every recognized ZIP becomes 00000. | Conditional rule implemented; default deny pending approved Census evidence |
+| ZIP codes | Preserves an approved eligible three-digit prefix; all other prefixes become 000. ZIP+4 extensions are removed. The current policy has no approved Census allowlist, so every recognized ZIP becomes 000. | Conditional rule implemented; default deny pending approved Census evidence |
 | Dates except year | Recognized valid dates become [YYYY] | Partial |
 | Ages over 89 | Structured DOB, DOB-context narrative dates, or explicit ages become [Age: 90 or older] | Partial |
 | Telephone numbers | Recognized North American and selected international formats become [Telephone Number] | Partial |
@@ -52,7 +54,7 @@ HHS defines 18 Safe Harbor identifier types. The requested list contains 20 oper
 | Web URLs | Recognized URLs become [URL] | Deterministic pattern |
 | IP addresses | Valid IPv4 values become [IP Address] | IPv4 only |
 | Biometric identifiers | Only labeled textual biometric IDs become [Biometric Identifier] | Content unsupported |
-| Full-face photos | Workbooks containing drawings/media are rejected | No image redaction |
+| Full-face photos | Workbooks containing media or drawing objects are rejected; empty Excel drawing containers are accepted | No image redaction |
 | Other unique characteristics | Structured Record_No and Patient_ID cells use random 8-character hex tokens; known or labeled narrative codes become [Other Unique Identifier] | Partial |
 
 Official reference: [HHS de-identification guidance](https://www.hhs.gov/hipaa/for-professionals/special-topics/de-identification/index.html).
@@ -123,7 +125,7 @@ Run the core workbook, schema, transformation, state, and export-gate tests:
 
 Expected result:
 
-    Tests run: 27
+    Tests run: 30
     Failures: 0
     All core milestone tests passed.
 

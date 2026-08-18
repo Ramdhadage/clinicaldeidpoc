@@ -1,3 +1,45 @@
+empty_drawing_container <- function(xml) {
+  !grepl(
+    "<(?:[[:alnum:]_-]+:)?(?:twoCellAnchor|oneCellAnchor|absoluteAnchor)(?:[[:space:]>/])",
+    xml,
+    perl = TRUE
+  )
+}
+
+
+read_xlsx_archive_entry <- function(path, entry_name) {
+  connection <- unz(path, entry_name, open = "rt")
+  on.exit(close(connection), add = TRUE)
+  paste(readLines(connection, warn = FALSE), collapse = "\n")
+}
+
+
+contains_unsupported_drawing <- function(path, entry_names) {
+  drawing_entries <- entry_names[grepl(
+    "^xl/drawings/[^/]+\\.xml$",
+    entry_names,
+    ignore.case = TRUE,
+    perl = TRUE
+  )]
+
+  if (length(drawing_entries) == 0L) {
+    return(FALSE)
+  }
+
+  any(vapply(
+    drawing_entries,
+    function(entry_name) {
+      xml <- tryCatch(
+        read_xlsx_archive_entry(path, entry_name),
+        error = function(e) NULL
+      )
+      is.null(xml) || !empty_drawing_container(xml)
+    },
+    logical(1)
+  ))
+}
+
+
 inspect_clinical_workbook <- function(
     path,
     original_name = basename(path),
@@ -60,7 +102,7 @@ inspect_clinical_workbook <- function(
     "^xl/media/",
     "^xl/externalLinks/",
     "^xl/embeddings/",
-    "^xl/drawings/"
+    "(^|/)vbaProjectSignature\\.bin$"
   )
 
   unsupported <- vapply(
@@ -78,11 +120,11 @@ inspect_clinical_workbook <- function(
     logical(1)
   )
 
-  if (any(unsupported)) {
+  if (any(unsupported) || contains_unsupported_drawing(path, entry_names)) {
     deid_abort(
       code = "UNSUPPORTED_WORKBOOK_CONTENT",
       message = paste(
-        "The workbook contains media, drawings, external links,",
+        "The workbook contains media, drawing objects, external links,",
         "embedded objects, or macros that are outside this milestone."
       ),
       subclass = "deid_input_error"

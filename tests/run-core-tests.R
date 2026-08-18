@@ -153,6 +153,7 @@ synthetic_fixture <- function() {
     ),
     MRN = c("MRN-12345678", "MRN-22222222", NA),
     Patient_ID = c("SUBJ-001", "SUBJ-002", NA),
+    Zip_Code = c("44101", "05910", NA),
     stringsAsFactors = FALSE,
     check.names = FALSE
   )
@@ -226,8 +227,8 @@ token_factory_from <- function(values) {
 
 run_test("configuration matches the locked milestone", {
   expect_true(inherits(config, "DeidConfig"))
-  expect_identical(config$schema$schema_version, "0.2.0")
-  expect_identical(config$policy$policy_version, "0.4.0")
+  expect_identical(config$schema$schema_version, "0.3.0")
+  expect_identical(config$policy$policy_version, "0.5.0")
   expect_identical(config$schema$sheet_name, "Clinical_Data")
   expect_identical(config$runtime$mode, "synthetic_only")
   expect_false(config$runtime$release_enabled)
@@ -255,7 +256,8 @@ run_test("configuration matches the locked milestone", {
       "Diagnosis_Journey",
       "Treatment_History",
       "MRN",
-      "Patient_ID"
+      "Patient_ID",
+      "Zip_Code"
     )
   )
 })
@@ -304,6 +306,16 @@ run_test("valid workbook reads the exact Clinical_Data sheet", {
   expect_true(inherits(dataset, "InputDataset"))
   expect_identical(dataset$metadata$additional_sheets, "Read_Me")
   expect_identical(nrow(dataset$data), 3L)
+})
+
+
+run_test("empty drawing containers are accepted but drawing objects fail", {
+  expect_true(empty_drawing_container(
+    '<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"/>'
+  ))
+  expect_false(empty_drawing_container(
+    '<xdr:wsDr><xdr:twoCellAnchor/></xdr:wsDr>'
+  ))
 })
 
 
@@ -367,6 +379,13 @@ run_test("schema is exact and reordered input is canonicalized", {
     "deid_invalid_schema",
     "UNEXPECTED_COLUMNS"
   )
+  invalid_zip <- data
+  invalid_zip$Zip_Code[[1]] <- "ZIP-44101"
+  expect_deid_error(
+    validate_clinical_schema(invalid_zip, config),
+    "deid_invalid_schema",
+    "INVALID_ZIP_CODE_TYPE"
+  )
 })
 
 
@@ -399,6 +418,7 @@ run_test("structured identifiers are removed and DOB is generalized", {
     logical(1)
   )))
   expect_identical(result$data$DOB, c("1980", "90+", "1936"))
+  expect_identical(result$data$Zip_Code, c("000", "000", NA_character_))
   expect_identical(
     result$data$Diagnosis_Journey,
     input_before$Diagnosis_Journey
@@ -455,6 +475,16 @@ run_test("supported display dates and Excel timestamps retain the correct year",
     age_90_plus_value = config$policy$age_90_plus_value
   )
   expect_identical(unname(actual), expected)
+})
+
+
+run_test("numeric and non-US postal values are generalized safely", {
+  data <- synthetic_fixture()
+  data$Zip_Code <- c("44101.0", "04410.0", "560001.0")
+  validated <- validate_clinical_schema(data, config)
+  result <- transform_structured_fields(validated, config)
+
+  expect_identical(result$data$Zip_Code, c("000", "000", NA_character_))
 })
 
 
@@ -786,7 +816,7 @@ run_test("deterministic preview tags requested identifier examples", {
     "Patient ID: PT-001-ABC." = "[Other Unique Identifier]",
     "Biometric template: BIO-12345." = "[Biometric Identifier]",
     "Call 216-555-0188." = "[Telephone Number]",
-    "ZIP 44101." = "ZIP 00000."
+    "ZIP 44101." = "ZIP 000."
   )
   for (example in names(contextual_examples)) {
     tagged <- redact_narrative_for_test(example, config = config)
@@ -976,15 +1006,15 @@ run_test("ZIP preview applies the conditional three-digit exception", {
 
   expect_identical(
     redact_narrative_for_test("ZIP 44101 and 05910.", config = allowed_config),
-    "ZIP 44100 and 00000."
+    "ZIP 441 and 000."
   )
   expect_identical(
     redact_narrative_for_test("ZIP 44101.", config = config),
-    "ZIP 00000."
+    "ZIP 000."
   )
   expect_identical(
     redact_narrative_for_test("ZIP 44101-1234.", config = allowed_config),
-    "ZIP 44100."
+    "ZIP 441."
   )
 })
 

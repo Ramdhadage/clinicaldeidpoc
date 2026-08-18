@@ -544,13 +544,11 @@ birth_year_preview_tag <- function(year, config) {
 
 
 safe_harbor_zip_preview_value <- function(value, config) {
-  prefix <- substr(value, 1L, 3L)
   eligible_prefixes <- unlist(
     config$policy$preview$zip_code$eligible_three_digit_prefixes,
     use.names = FALSE
   )
-  retained_prefix <- if (prefix %in% eligible_prefixes) prefix else "000"
-  paste0(retained_prefix, "00")
+  generalize_zip_code_value(value, eligible_prefixes)
 }
 
 

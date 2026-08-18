@@ -49,7 +49,7 @@ validate_deid_config <- function(config) {
   policy <- config$policy
   runtime <- config$runtime
 
-  if (!identical(schema$schema_version, "0.2.0")) {
+  if (!identical(schema$schema_version, "0.3.0")) {
     deid_abort(
       code = "INVALID_SCHEMA_VERSION",
       message = "The schema configuration version is not supported.",
@@ -73,13 +73,14 @@ validate_deid_config <- function(config) {
     "Diagnosis_Journey",
     "Treatment_History",
     "MRN",
-    "Patient_ID"
+    "Patient_ID",
+    "Zip_Code"
   )
 
   if (!identical(columns$name, expected) || anyDuplicated(columns$name)) {
     deid_abort(
       code = "INVALID_COLUMN_CONFIGURATION",
-      message = "The configured columns do not match the approved seven-column contract.",
+      message = "The configured columns do not match the approved eight-column contract.",
       subclass = "deid_config_error"
     )
   }
@@ -91,7 +92,8 @@ validate_deid_config <- function(config) {
     "free_text",
     "free_text",
     "direct_identifier",
-    "direct_identifier"
+    "direct_identifier",
+    "geographic_identifier"
   )
 
   if (!identical(columns$role, expected_roles)) {
@@ -109,7 +111,8 @@ validate_deid_config <- function(config) {
     "deterministic_tagged_preview_only",
     "deterministic_tagged_preview_only",
     "remove",
-    "remove"
+    "remove",
+    "retain_eligible_three_digit_or_000"
   )
   if (!identical(columns$action, expected_actions)) {
     deid_abort(

@@ -1,4 +1,4 @@
-schema_version: "0.2.0"
+schema_version: "0.3.0"
 sheet_name: "Clinical_Data"
 allow_additional_sheets: true
 allow_additional_columns: false
@@ -39,3 +39,8 @@ columns:
     type: "character"
     required: true
     action: "remove"
+  - name: "Zip_Code"
+    role: "geographic_identifier"
+    type: "zip_code"
+    required: true
+    action: "retain_eligible_three_digit_or_000"

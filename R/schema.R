@@ -104,6 +104,25 @@ validate_clinical_schema <- function(
     )
   }
 
+  zip_values <- canonical$Zip_Code
+  invalid_zip <- !is.na(zip_values) &
+    !grepl(
+      "^(?:[0-9]{4,9}(?:\\.0+)?|[0-9]{5}-[0-9]{4})$",
+      zip_values,
+      perl = TRUE
+    )
+
+  if (any(invalid_zip)) {
+    deid_abort(
+      code = "INVALID_ZIP_CODE_TYPE",
+      message = paste(
+        "Zip_Code must contain a five-digit ZIP or ZIP+4 value,",
+        "a numeric postal code, or be missing."
+      ),
+      subclass = "deid_invalid_schema"
+    )
+  }
+
   structure(
     list(
       data = canonical,
@@ -114,4 +133,3 @@ validate_clinical_schema <- function(
     class = c("SchemaValidation", "list")
   )
 }
-

@@ -62,6 +62,17 @@ validate_structured_result <- function(
     )
   }
 
+  zip_valid <- is.na(output$Zip_Code) |
+    grepl("^[0-9]{3}$", output$Zip_Code, perl = TRUE)
+
+  if (!all(zip_valid)) {
+    deid_abort(
+      code = "ZIP_GENERALIZATION_FAILED",
+      message = "A generalized Zip_Code value is outside the approved output format.",
+      subclass = "deid_validation_error"
+    )
+  }
+
   narrative_columns <- schema_columns(config)$name[
     schema_columns(config)$role == "free_text"
   ]
@@ -83,6 +94,7 @@ validate_structured_result <- function(
       column_contract_preserved = TRUE,
       direct_values_removed = TRUE,
       dob_generalization_valid = TRUE,
+      zip_generalization_valid = TRUE,
       tagged_preview_only = TRUE,
       narrative_redaction_validated = FALSE,
       blockers = blockers,

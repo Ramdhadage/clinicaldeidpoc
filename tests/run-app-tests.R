@@ -51,6 +51,7 @@ sample_data <- data.frame(
   ),
   MRN = c("SYN-MRN-001", "SYN-MRN-002"),
   Patient_ID = c("SYN-001", "SYN-002"),
+  Zip_Code = c("44101", "05910"),
   stringsAsFactors = FALSE,
   check.names = FALSE
 )

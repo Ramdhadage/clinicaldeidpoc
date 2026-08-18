@@ -132,6 +132,29 @@ generalize_dob_value <- function(value, reference_date, age_90_plus_value) {
 }
 
 
+generalize_zip_code_value <- function(value, eligible_prefixes) {
+  if (is.na(value)) {
+    return(NA_character_)
+  }
+
+  normalized_value <- sub("\\.0+$", "", value, perl = TRUE)
+  if (grepl("^[0-9]{4}$", normalized_value, perl = TRUE)) {
+    normalized_value <- paste0("0", normalized_value)
+  }
+  if (grepl("^[0-9]{9}$", normalized_value, perl = TRUE)) {
+    normalized_value <- substr(normalized_value, 1L, 5L)
+  }
+
+  if (!grepl("^[0-9]{5}(?:-[0-9]{4})?$", normalized_value, perl = TRUE)) {
+    return(NA_character_)
+  }
+
+  prefix <- substr(normalized_value, 1L, 3L)
+  retained_prefix <- if (prefix %in% eligible_prefixes) prefix else "000"
+  retained_prefix
+}
+
+
 transform_structured_fields <- function(
     schema_validation,
     config = read_deid_config(".")
@@ -161,6 +184,25 @@ transform_structured_fields <- function(
     output[[column]] <- rep(NA_character_, nrow(output))
   }
 
+  geographic_columns <- classification$name[
+    classification$role == "geographic_identifier"
+  ]
+  eligible_prefixes <- unlist(
+    config$policy$preview$zip_code$eligible_three_digit_prefixes,
+    use.names = FALSE
+  )
+  generalized_counts <- integer(length(geographic_columns))
+  names(generalized_counts) <- geographic_columns
+  for (column in geographic_columns) {
+    generalized_counts[[column]] <- sum(!is.na(output[[column]]))
+    output[[column]] <- vapply(
+      output[[column]],
+      generalize_zip_code_value,
+      character(1),
+      eligible_prefixes = eligible_prefixes
+    )
+  }
+
   output$DOB <- vapply(
     output$DOB,
     generalize_dob_value,
@@ -174,9 +216,12 @@ transform_structured_fields <- function(
       data = output,
       classification = classification,
       transformation_summary = data.frame(
-        column = direct_columns,
-        action = rep("remove", length(direct_columns)),
-        affected_cells = unname(removed_counts),
+        column = c(direct_columns, geographic_columns),
+        action = c(
+          rep("remove", length(direct_columns)),
+          rep("retain_eligible_three_digit_or_000", length(geographic_columns))
+        ),
+        affected_cells = c(unname(removed_counts), unname(generalized_counts)),
         stringsAsFactors = FALSE
       ),
       reference_date = reference_date

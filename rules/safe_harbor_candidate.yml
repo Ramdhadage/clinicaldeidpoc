@@ -1,5 +1,5 @@
 policy_id: "safe_harbor_candidate"
-policy_version: "0.4.0"
+policy_version: "0.5.0"
 status: "PROPOSED_REQUIRES_APPROVAL"
 profile: "safe_harbor_candidate"
 reference_date: "2026-08-12"
