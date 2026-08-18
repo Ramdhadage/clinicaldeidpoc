@@ -210,6 +210,12 @@ verify_release_workbook_for_test <- internal_function_for_test(
 build_validation_summary_for_test <- internal_function_for_test(
   "build_validation_summary_sheet"
 )
+write_synthetic_preview_workbook_for_test <- internal_function_for_test(
+  "write_synthetic_preview_workbook"
+)
+verify_synthetic_preview_workbook_for_test <- internal_function_for_test(
+  "verify_synthetic_preview_workbook"
+)
 
 
 token_factory_from <- function(values) {
@@ -996,6 +1002,55 @@ run_test("export is blocked and creates no file", {
     "EXPORT_NOT_APPROVED"
   )
   expect_false(file.exists(output_path))
+})
+
+
+run_test("synthetic tagged preview download is verified and non-releasing", {
+  path <- write_fixture_workbook(synthetic_fixture())
+  on.exit(unlink(path, force = TRUE), add = TRUE)
+  dataset <- read_clinical_workbook(
+    path,
+    original_name = "synthetic.xlsx",
+    config = config
+  )
+  run <- run_structured_deidentification(dataset, config)
+  output_path <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(output_path, force = TRUE), add = TRUE)
+
+  write_synthetic_preview_workbook_for_test(run, output_path, config)
+
+  preview <- create_tagged_preview(run, config)
+  notice <- data.frame(
+    notice = c(
+      "Classification",
+      "Release status",
+      "Restriction",
+      "Required use"
+    ),
+    value = c(
+      "Synthetic tagged preview",
+      "Not releasable",
+      "Not validated anonymization or a HIPAA Safe Harbor determination",
+      "Synthetic evaluation only; do not use or disclose as de-identified data"
+    ),
+    stringsAsFactors = FALSE
+  )
+  expect_identical(
+    verify_synthetic_preview_workbook_for_test(output_path, preview, notice),
+    TRUE
+  )
+  expect_identical(run$state, "PROCESSED")
+  expect_false(can_release(run, config))
+
+  unprocessed <- new_deid_run(config$hash)
+  blocked_path <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(blocked_path, force = TRUE), add = TRUE)
+  expect_deid_error(
+    write_synthetic_preview_workbook_for_test(unprocessed, blocked_path, config),
+    "deid_preview_download_error",
+    "PREVIEW_DOWNLOAD_NOT_ALLOWED"
+  )
+  expect_false(file.exists(blocked_path))
 })
 
 

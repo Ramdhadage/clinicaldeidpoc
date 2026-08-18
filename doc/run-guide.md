@@ -24,7 +24,7 @@ It currently:
 - Generates the structured ID tokens from secure random bytes once per run, rejects collisions, keeps them only in session memory, and regenerates them for a new run.
 - Applies ordered deterministic transformations to selected narrative patterns, including known names and identifiers, dates, contact details, URLs, IP addresses, labeled codes, addresses, ZIP codes, and facilities.
 - Invalidates previous results whenever another file is uploaded.
-- Blocks every download/export because Azure free-text processing, complete validation, human review, and approval have not yet been implemented.
+- Blocks anonymized-data release/export because Azure free-text processing, complete validation, human review, and approval have not yet been implemented. A separate synthetic tagged-preview XLSX can be downloaded only after synthetic-data confirmation; it is not anonymized or releasable.
 
 This milestone does **not** produce a releasable or HIPAA-de-identified dataset.
 
@@ -214,7 +214,7 @@ To stop the app, return to PowerShell and press **Ctrl+C**.
    - Diagnosis_Journey — NARRATIVE_REDACTION_NOT_VALIDATED
    - Treatment_History — NARRATIVE_REDACTION_NOT_VALIDATED
 
-8. Confirm that no download button is available.
+8. Select **Download synthetic tagged preview (XLSX)** only for synthetic evaluation. The workbook contains `Synthetic_Tagged_Preview` and `Preview_Notice` sheets; it is not anonymized, not releasable, and must not be used or disclosed as de-identified data.
 
 ## 11. Expected Fail-Closed Behavior
 
@@ -229,6 +229,7 @@ To stop the app, return to PowerShell and press **Ctrl+C**.
 | Synthetic-data confirmation not selected | Processing rejected |
 | New workbook uploaded | Previous result and validation state cleared |
 | Export called before approval | EXPORT_NOT_APPROVED; no file created |
+| Synthetic tagged-preview download after confirmation | XLSX contains only the derived tagged preview and a non-releasable notice; no run is released |
 | Structured processing succeeds | State remains PROCESSED, not APPROVED |
 
 ## 12. Important Data-Handling Rules
@@ -238,7 +239,7 @@ To stop the app, return to PowerShell and press **Ctrl+C**.
 - Do not enable release_enabled in config/poc.yml.
 - Do not add API keys, bearer tokens, or connection strings to .Rprofile, .Renviron, YAML files, or Git.
 - Do not describe the tagged preview as anonymized or Safe Harbor compliant.
-- Treat run-scoped hexadecimal preview tokens as sensitive, ephemeral pseudonymous values; do not persist, export, or use them for cross-run linkage.
+- Treat run-scoped hexadecimal preview tokens as sensitive, ephemeral pseudonymous values; do not persist or use them for cross-run linkage. They may appear only in the synthetic tagged-preview XLSX, which remains non-releasable.
 - Generated runtime files and the project-local R library are excluded by .gitignore.
 
 ## 13. Troubleshooting

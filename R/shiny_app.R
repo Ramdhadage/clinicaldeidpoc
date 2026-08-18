@@ -76,13 +76,14 @@ build_deid_ui <- function(config) {
           )
         ),
         DT::DTOutput("tagged_preview"),
+        shiny::uiOutput("synthetic_preview_download"),
         shiny::tags$h3("Critical validation blockers"),
         DT::DTOutput("blockers"),
         shiny::tags$div(
           class = "alert alert-warning",
-          shiny::tags$strong("Download unavailable. "),
+          shiny::tags$strong("Release unavailable. "),
           paste(
-            "No output can be released because Azure PII processing, residual-",
+            "No anonymized output can be released because Azure PII processing, residual-",
             "identifier validation, human review, and approval are incomplete."
           )
         )
@@ -245,6 +246,58 @@ build_deid_server <- function(config) {
         )
       )
     })
+
+    output$synthetic_preview_download <- shiny::renderUI({
+      run <- run_value()
+      preview <- tagged_preview_value()
+      preview_complete <- !is.null(preview) && !any(
+        unlist(preview, use.names = FALSE) ==
+          config$policy$preview$failure_placeholder,
+        na.rm = TRUE
+      )
+
+      if (
+        !isTRUE(input$confirm_synthetic) ||
+        !identical(run$state, "PROCESSED") ||
+        !preview_complete
+      ) {
+        return(NULL)
+      }
+
+      shiny::tagList(
+        shiny::tags$div(
+          class = "alert alert-info",
+          shiny::tags$strong("Synthetic tagged preview download only. "),
+          paste(
+            "This XLSX is not anonymized, not releasable, and must not be",
+            "used or disclosed as de-identified data."
+          )
+        ),
+        shiny::downloadButton(
+          "download_synthetic_preview",
+          "Download synthetic tagged preview (XLSX)",
+          class = "btn-secondary"
+        )
+      )
+    })
+
+    output$download_synthetic_preview <- shiny::downloadHandler(
+      filename = function() {
+        "synthetic-tagged-preview-not-releasable.xlsx"
+      },
+      content = function(file) {
+        if (!isTRUE(input$confirm_synthetic)) {
+          deid_abort(
+            code = "SYNTHETIC_CONFIRMATION_REQUIRED",
+            message = "Confirm synthetic-only data before downloading a preview.",
+            subclass = "deid_governance_error"
+          )
+        }
+
+        write_synthetic_preview_workbook(run_value(), file, config)
+      },
+      contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
     output$blockers <- DT::renderDT({
       run <- run_value()

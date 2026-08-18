@@ -156,8 +156,10 @@ source_text <- paste(
   readLines(file.path(project_root, "R", "shiny_app.R"), warn = FALSE),
   collapse = "\n"
 )
-stopifnot(!grepl("downloadHandler", source_text, fixed = TRUE))
-stopifnot(!grepl("downloadButton", source_text, fixed = TRUE))
+stopifnot(grepl("downloadHandler", source_text, fixed = TRUE))
+stopifnot(grepl("downloadButton", source_text, fixed = TRUE))
+stopifnot(grepl("download_synthetic_preview", source_text, fixed = TRUE))
+stopifnot(grepl("not releasable", source_text, fixed = TRUE))
 stopifnot(grepl("Synthetic tagged preview", source_text, fixed = TRUE))
 stopifnot(grepl("not validated", source_text, fixed = TRUE))
 stopifnot(grepl("Dates are displayed as [YYYY]", source_text, fixed = TRUE))
@@ -170,7 +172,7 @@ stopifnot(grepl("escape = TRUE", source_text, fixed = TRUE))
 ui_text <- paste(as.character(build_deid_ui(config)), collapse = "\n")
 stopifnot(grepl("Synthetic demonstration only", ui_text, fixed = TRUE))
 stopifnot(grepl("alert alert-danger", ui_text, fixed = TRUE))
-stopifnot(grepl("Download unavailable", ui_text, fixed = TRUE))
+stopifnot(grepl("Release unavailable", ui_text, fixed = TRUE))
 stopifnot(!grepl("shiny-download-link", ui_text, fixed = TRUE))
 
 cat("All Shiny milestone tests passed.\n")

@@ -12,6 +12,142 @@ normalize_release_sheet <- function(data) {
 }
 
 
+build_synthetic_preview_notice <- function() {
+  data.frame(
+    notice = c(
+      "Classification",
+      "Release status",
+      "Restriction",
+      "Required use"
+    ),
+    value = c(
+      "Synthetic tagged preview",
+      "Not releasable",
+      "Not validated anonymization or a HIPAA Safe Harbor determination",
+      "Synthetic evaluation only; do not use or disclose as de-identified data"
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+
+prepare_synthetic_preview_download <- function(run, config) {
+  if (!inherits(run, "DeidRun") || !inherits(config, "DeidConfig")) {
+    deid_abort(
+      code = "PREVIEW_DOWNLOAD_NOT_ALLOWED",
+      message = "A processed synthetic preview and valid configuration are required.",
+      subclass = "deid_preview_download_error"
+    )
+  }
+
+  validate_deid_config(config)
+
+  if (
+    !identical(config$runtime$mode, "synthetic_only") ||
+    isTRUE(config$runtime$release_enabled) ||
+    !identical(run$state, "PROCESSED") ||
+    is.null(run$validation) ||
+    !isTRUE(run$validation$tagged_preview_only) ||
+    isTRUE(run$validation$narrative_redaction_validated)
+  ) {
+    deid_abort(
+      code = "PREVIEW_DOWNLOAD_NOT_ALLOWED",
+      message = "Only a non-releasing synthetic tagged preview can be downloaded.",
+      subclass = "deid_preview_download_error"
+    )
+  }
+
+  preview <- create_tagged_preview(run, config)
+  if (is.null(preview) || any(
+    unlist(preview, use.names = FALSE) ==
+      config$policy$preview$failure_placeholder,
+    na.rm = TRUE
+  )) {
+    deid_abort(
+      code = "PREVIEW_DOWNLOAD_NOT_ALLOWED",
+      message = "The synthetic tagged preview is incomplete and cannot be downloaded.",
+      subclass = "deid_preview_download_error"
+    )
+  }
+
+  list(
+    preview = preview,
+    notice = build_synthetic_preview_notice()
+  )
+}
+
+
+verify_synthetic_preview_workbook <- function(path, preview, notice) {
+  expected_sheets <- c("Synthetic_Tagged_Preview", "Preview_Notice")
+  if (!identical(readxl::excel_sheets(path), expected_sheets)) {
+    deid_abort(
+      code = "PREVIEW_DOWNLOAD_VERIFICATION_FAILED",
+      message = "The synthetic preview workbook failed sheet verification.",
+      subclass = "deid_preview_download_error"
+    )
+  }
+
+  read_sheet <- function(sheet) {
+    normalize_release_sheet(readxl::read_excel(
+      path,
+      sheet = sheet,
+      col_types = "text",
+      trim_ws = FALSE,
+      .name_repair = "minimal"
+    ))
+  }
+
+  if (
+    !identical(
+      read_sheet("Synthetic_Tagged_Preview"),
+      normalize_release_sheet(preview)
+    ) ||
+    !identical(read_sheet("Preview_Notice"), normalize_release_sheet(notice))
+  ) {
+    deid_abort(
+      code = "PREVIEW_DOWNLOAD_VERIFICATION_FAILED",
+      message = "The synthetic preview workbook failed exact content verification.",
+      subclass = "deid_preview_download_error"
+    )
+  }
+
+  invisible(TRUE)
+}
+
+
+write_synthetic_preview_workbook <- function(run, path, config) {
+  assert_scalar_character(path, "path")
+
+  if (!identical(tolower(tools::file_ext(path)), "xlsx")) {
+    deid_abort(
+      code = "INVALID_OUTPUT_TYPE",
+      message = "Synthetic preview output must use the .xlsx extension.",
+      subclass = "deid_preview_download_error"
+    )
+  }
+
+  download <- prepare_synthetic_preview_download(run, config)
+  require_deid_namespace("writexl")
+  require_deid_namespace("readxl")
+
+  writexl::write_xlsx(
+    list(
+      Synthetic_Tagged_Preview = download$preview,
+      Preview_Notice = download$notice
+    ),
+    path
+  )
+
+  verify_synthetic_preview_workbook(
+    path,
+    download$preview,
+    download$notice
+  )
+
+  invisible(path)
+}
+
+
 verify_release_workbook <- function(
     path,
     expected_data,
