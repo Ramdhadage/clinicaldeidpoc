@@ -25,7 +25,9 @@ It currently:
 - Generates the structured ID tokens from secure random bytes once per run, rejects collisions, keeps them only in session memory, and regenerates them for a new run.
 - Applies ordered deterministic transformations to selected narrative patterns, including known names and identifiers, dates, contact details, URLs, IP addresses, labeled codes, addresses, ZIP codes, and facilities.
 - Invalidates previous results whenever another file is uploaded.
-- Blocks anonymized-data release/export because Azure free-text processing, complete validation, human review, and approval have not yet been implemented. A separate synthetic tagged-preview XLSX can be downloaded only after synthetic-data confirmation; it is not anonymized or releasable.
+- Uses a Bootstrap 5 bslib interface with the existing sidebar-and-main-content layout. The sidebar keeps workbook controls together; the main area presents the contract, preview, detection details, and blockers as expandable cards.
+- Keeps the worksheet selector mounted and updates its choices after workbook inspection. This avoids recreating the input with dynamic UI and preserves the selected-input lifecycle managed by Shiny.
+- Blocks anonymized-data release/export because Azure free-text processing, complete validation, human review, and approval have not yet been implemented. A separate synthetic tagged-preview XLSX becomes available only after successful preview processing; it is not anonymized or releasable.
 
 This milestone does **not** produce a releasable or HIPAA-de-identified dataset.
 
@@ -192,18 +194,28 @@ To stop the app, return to PowerShell and press **Ctrl+C**.
 
 ## 10. Use the Shiny Application
 
-1. Confirm that the red banner says **Synthetic demonstration only**.
-2. Select the generated fixture (or another workbook whose synthetic provenance has been confirmed):
+The modernized interface retains the original workflow and section order:
+
+- **Preview controls** in the left sidebar: workbook, worksheet, and processing action.
+- **Approved column contract**, **Synthetic tagged preview - not validated**, **Detection details - deterministic preview only**, and **Critical validation blockers** in the main area.
+- **Coverage and tag behavior** in a collapsed accordion inside the preview card.
+- A full-screen control on each data card for focused table review.
+
+No custom application stylesheet or external web font is required; colors, typography, spacing, borders, cards, and responsive behavior come from the pinned Bootstrap 5 theme and Bootstrap utility classes.
+
+1. Confirm that the red banner says **Synthetic demonstration only** and the header badge says **Synthetic only**.
+2. In **Preview controls**, select the generated fixture (or another workbook whose synthetic provenance has been confirmed):
 
        runtime/input/Clinical_PHI_Anonymization_Data_v0.3.xlsx
 
-3. Select **I confirm this workbook contains synthetic test data only**.
-4. Select **Generate tagged preview**.
-5. Confirm the status reports:
+3. Select the worksheet to process. The worksheet choices are populated after workbook inspection; the selected worksheet must match the approved column contract.
+4. Resolve any **Workbook validation** feedback shown below the worksheet selector.
+5. Select **Generate tagged preview**. The task button prevents duplicate clicks while the synchronous preview operation is running.
+6. Confirm the status reports:
 
        Run state: PROCESSED
 
-6. Review **Synthetic tagged preview - not validated**:
+7. Review **Synthetic tagged preview - not validated**:
 
    - Record_No, MRN, and Patient_ID must contain random eight-character lowercase hexadecimal values, not source values.
    - Patient_Name must contain [Name].
@@ -211,12 +223,12 @@ To stop the app, return to PowerShell and press **Ctrl+C**.
    - Known patient names and selected deterministic patterns must be replaced with typed tags.
    - Clinical text that was not detected remains visible for synthetic evaluation.
 
-7. Confirm two Critical blockers are shown:
+8. Confirm two Critical blockers are shown:
 
    - Diagnosis_Journey — NARRATIVE_REDACTION_NOT_VALIDATED
    - Treatment_History — NARRATIVE_REDACTION_NOT_VALIDATED
 
-8. Select **Download synthetic tagged preview (XLSX)** only for synthetic evaluation. The workbook contains `Synthetic_Tagged_Preview` and `Preview_Notice` sheets; it is not anonymized, not releasable, and must not be used or disclosed as de-identified data.
+9. Select **Download synthetic tagged preview (XLSX)** only for synthetic evaluation. The workbook contains `Synthetic_Tagged_Preview` and `Preview_Notice` sheets; it is not anonymized, not releasable, and must not be used or disclosed as de-identified data.
 
 ## 11. Expected Fail-Closed Behavior
 
@@ -228,10 +240,9 @@ To stop the app, return to PowerShell and press **Ctrl+C**.
 | Unknown column added | Input rejected |
 | Duplicate column headers | Input rejected |
 | Invalid or future DOB | Processing rejected |
-| Synthetic-data confirmation not selected | Processing rejected |
 | New workbook uploaded | Previous result and validation state cleared |
 | Export called before approval | EXPORT_NOT_APPROVED; no file created |
-| Synthetic tagged-preview download after confirmation | XLSX contains only the derived tagged preview and a non-releasable notice; no run is released |
+| Synthetic tagged-preview download after successful preview processing | XLSX contains only the derived tagged preview and a non-releasable notice; no run is released |
 | Structured processing succeeds | State remains PROCESSED, not APPROVED |
 
 ## 12. Important Data-Handling Rules

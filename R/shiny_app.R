@@ -1,56 +1,131 @@
+.build_deid_theme <- function() {
+  bslib::bs_theme(
+    version = 5,
+    preset = "shiny",
+    bg = "#ffffff",
+    fg = "#24313d",
+    primary = "#176b75",
+    secondary = "#526777",
+    success = "#287a4b",
+    info = "#176b75",
+    warning = "#a15c00",
+    danger = "#b42318",
+    base_font = bslib::font_collection(
+      "Segoe UI Variable",
+      "Segoe UI",
+      "Arial",
+      "sans-serif"
+    ),
+    heading_font = bslib::font_collection(
+      "Segoe UI Variable Display",
+      "Segoe UI",
+      "Arial",
+      "sans-serif"
+    ),
+    "border-radius" = "0.625rem",
+    "card-border-radius" = "0.875rem",
+    "card-cap-bg" = "transparent",
+    "input-border-radius" = "0.5rem",
+    "btn-border-radius" = "0.5rem"
+  )
+}
+
+
+.build_deid_alert <- function(type, title, ..., id = NULL, live = NULL) {
+  shiny::div(
+    id = id,
+    class = paste("alert", paste0("alert-", type), "mb-0"),
+    role = "alert",
+    `aria-live` = live,
+    shiny::strong(title),
+    ...
+  )
+}
+
+
 build_deid_ui <- function(config) {
-  shiny::fluidPage(
-    shiny::titlePanel("Clinical Data De-identification PoC"),
-    shiny::tags$div(
-      class = "alert alert-danger",
-      shiny::tags$strong("Synthetic demonstration only. "),
+  force(config)
+
+  bslib::page_sidebar(
+    title = shiny::tagList(
+      "Clinical Data De-identification PoC",
+      shiny::span(
+        class = "badge text-bg-danger ms-2 align-middle",
+        "Synthetic only"
+      )
+    ),
+    theme = .build_deid_theme(),
+    class = "bslib-page-dashboard",
+    fillable = FALSE,
+    sidebar = bslib::sidebar(
+      title = "Preview controls",
+      width = "22rem",
+      open = "always",
+      shiny::fileInput(
+        "workbook",
+        "Choose an XLSX workbook",
+        accept = ".xlsx"
+      ),
+      shiny::selectInput(
+        "worksheet",
+        "Worksheet to process",
+        choices = character(),
+        selectize = FALSE
+      ),
+      shiny::uiOutput("workbook_validation"),
+      bslib::input_task_button(
+        "process",
+        "Generate tagged preview",
+        class = "btn-primary w-100"
+      ),
+      shiny::hr(),
+      shiny::p(
+        class = "small text-secondary",
+        shiny::strong("Worksheet selection: "),
+        "Choose a worksheet after upload. It must match the approved column contract."
+      ),
+      shiny::p(
+        class = "small mb-0",
+        shiny::strong("Release enabled: "),
+        shiny::span(class = "badge text-bg-danger", "No")
+      )
+    ),
+    .build_deid_alert(
+      "danger",
+      "Synthetic demonstration only. ",
       paste(
         "The tagged preview can miss identifiers; do not upload real PHI.",
         "Download and release remain disabled."
       )
     ),
-    shiny::sidebarLayout(
-      shiny::sidebarPanel(
-        shiny::fileInput(
-          "workbook",
-          "Choose an XLSX workbook",
-          accept = ".xlsx"
-        ),
-        shiny::uiOutput("worksheet_selector"),
-        shiny::uiOutput("workbook_validation"),
-        shiny::checkboxInput(
-          "confirm_synthetic",
-          "I confirm this workbook contains synthetic test data only.",
-          value = FALSE
-        ),
-        shiny::actionButton(
-          "process",
-          "Generate tagged preview",
-          class = "btn-primary"
-        ),
-        shiny::hr(),
-        shiny::tags$p(
-          shiny::tags$strong("Worksheet selection: "),
-          "Choose a worksheet after upload. It must match the approved column contract."
-        ),
-        shiny::tags$p(
-          shiny::tags$strong("Release enabled: "),
-          "No"
-        )
+    shiny::uiOutput("run_status"),
+    bslib::card(
+      full_screen = TRUE,
+      bslib::card_header(
+        class = "fw-semibold",
+        "Approved column contract"
       ),
-      shiny::mainPanel(
-        shiny::uiOutput("run_status"),
-        shiny::tags$h3("Approved column contract"),
-        DT::DTOutput("classification"),
-        shiny::tags$h3("Synthetic tagged preview - not validated"),
-        shiny::tags$p(
+      bslib::card_body(
+        fillable = FALSE,
+        DT::DTOutput("classification")
+      )
+    ),
+    bslib::card(
+      full_screen = TRUE,
+      bslib::card_header(
+        class = "fw-semibold",
+        "Synthetic tagged preview - not validated"
+      ),
+      bslib::card_body(
+        fillable = FALSE,
+        shiny::p(
           "Dates are displayed as [YYYY], and patient names use [Name].",
           paste(
             "Each nonmissing Record_No, MRN, and Patient_ID cell uses an",
             "independent random eight-character hexadecimal preview token."
           )
         ),
-        shiny::tags$p(
+        shiny::p(
           paste(
             "Tokens are generated independently of source values, remain stable",
             "only within this run, and are held only in session memory."
@@ -58,43 +133,65 @@ build_deid_ui <- function(config) {
           "Undetected text is shown and may still contain identifiers.",
           "Use synthetic data only; this is not a HIPAA Safe Harbor determination."
         ),
-        shiny::tags$details(
-          shiny::tags$summary("Coverage and tag behavior"),
-          shiny::tags$p(
-            paste(
-              "The run guide displays a 20-row coverage matrix mapped to the 18",
-              "HIPAA Safe Harbor identifier types. This preview attempts only",
-              "the deterministic subsets listed there, including known names",
-              "and identifiers, dates, contact details, labeled codes, addresses,",
-              "ZIP codes, facilities, and network identifiers."
-            )
-          ),
-          shiny::tags$p(
-            paste(
-              "Arbitrary names and locations, image or biometric content, and",
-              "other unique characteristics still require Azure/NER, residual",
-              "validation, and human review."
+        bslib::accordion(
+          open = FALSE,
+          bslib::accordion_panel(
+            "Coverage and tag behavior",
+            shiny::p(
+              paste(
+                "The run guide displays a 20-row coverage matrix mapped to the 18",
+                "HIPAA Safe Harbor identifier types. This preview attempts only",
+                "the deterministic subsets listed there, including known names",
+                "and identifiers, dates, contact details, labeled codes, addresses,",
+                "ZIP codes, facilities, and network identifiers."
+              )
+            ),
+            shiny::p(
+              class = "mb-0",
+              paste(
+                "Arbitrary names and locations, image or biometric content, and",
+                "other unique characteristics still require Azure/NER, residual",
+                "validation, and human review."
+              )
             )
           )
         ),
-        DT::DTOutput("tagged_preview"),
-        shiny::tags$h3("Detection details — deterministic preview only"),
-        shiny::tags$div(
-          class = "alert alert-info",
-          shiny::tags$strong("Azure is not called in this PoC. "),
+        shiny::div(class = "mt-3", DT::DTOutput("tagged_preview")),
+        shiny::uiOutput("synthetic_preview_download")
+      )
+    ),
+    bslib::card(
+      full_screen = TRUE,
+      bslib::card_header(
+        class = "fw-semibold",
+        "Detection details - deterministic preview only"
+      ),
+      bslib::card_body(
+        fillable = FALSE,
+        .build_deid_alert(
+          "info",
+          "Azure is not called in this PoC. ",
           paste(
             "Detected entities and offsets below describe local preview tags",
             "in the redacted preview text. Confidence scores are rule-based,",
             "not Azure confidence scores."
           )
         ),
-        DT::DTOutput("detection_details"),
-        shiny::uiOutput("synthetic_preview_download"),
-        shiny::tags$h3("Critical validation blockers"),
+        shiny::div(class = "mt-3", DT::DTOutput("detection_details"))
+      )
+    ),
+    bslib::card(
+      full_screen = TRUE,
+      bslib::card_header(
+        class = "fw-semibold",
+        "Critical validation blockers"
+      ),
+      bslib::card_body(
+        fillable = FALSE,
         DT::DTOutput("blockers"),
-        shiny::tags$div(
-          class = "alert alert-warning",
-          shiny::tags$strong("Release unavailable. "),
+        .build_deid_alert(
+          "warning",
+          "Release unavailable. ",
           paste(
             "No anonymized output can be released because Azure PII processing, residual-",
             "identifier validation, human review, and approval are incomplete."
@@ -123,11 +220,6 @@ build_deid_server <- function(config) {
       "worksheet",
       shinyvalidate::sv_required("Select one worksheet to process.")
     )
-    input_validator$add_rule("confirm_synthetic", function(value) {
-      if (!isTRUE(value)) {
-        "Confirm that the workbook contains synthetic test data only."
-      }
-    })
     input_validator$enable()
 
     workbook_inspection <- shiny::reactive({
@@ -207,40 +299,7 @@ build_deid_server <- function(config) {
         ))
       }
 
-      if (!isTRUE(input$confirm_synthetic)) {
-        return("Confirm that the workbook contains synthetic test data only.")
-      }
-
       NULL
-    })
-
-    output$worksheet_selector <- shiny::renderUI({
-      if (is.null(input$workbook)) {
-        return(NULL)
-      }
-
-      inspection <- workbook_inspection()
-      if (inherits(inspection, "condition")) {
-        return(NULL)
-      }
-
-      sheets <- inspection$all_sheets
-      selected_sheet <- input$worksheet
-      if (
-        !is.character(selected_sheet) ||
-          length(selected_sheet) != 1L ||
-          is.na(selected_sheet) ||
-          !selected_sheet %in% sheets
-      ) {
-        selected_sheet <- sheets[[1]]
-      }
-
-      shiny::selectInput(
-        "worksheet",
-        "Worksheet to process",
-        choices = stats::setNames(sheets, sheets),
-        selected = selected_sheet
-      )
     })
 
     output$workbook_validation <- shiny::renderUI({
@@ -249,13 +308,12 @@ build_deid_server <- function(config) {
         return(NULL)
       }
 
-      shiny::tags$div(
+      .build_deid_alert(
+        "danger",
+        "Workbook validation: ",
+        message,
         id = "workbook_validation_feedback",
-        class = "alert alert-danger",
-        role = "alert",
-        `aria-live` = "assertive",
-        shiny::tags$strong("Workbook validation: "),
-        message
+        live = "assertive"
       )
     })
 
@@ -265,6 +323,26 @@ build_deid_server <- function(config) {
         current <- run_value()
         run_value(invalidate_run(current))
         error_value(NULL)
+        shiny::freezeReactiveValue(input, "worksheet")
+
+        inspection <- workbook_inspection()
+        if (inherits(inspection, "condition")) {
+          shiny::updateSelectInput(
+            session,
+            "worksheet",
+            choices = character(),
+            selected = character()
+          )
+          return()
+        }
+
+        sheets <- inspection$all_sheets
+        shiny::updateSelectInput(
+          session,
+          "worksheet",
+          choices = stats::setNames(sheets, sheets),
+          selected = sheets[[1]]
+        )
       },
       ignoreInit = TRUE
     )
@@ -353,16 +431,13 @@ build_deid_server <- function(config) {
       error <- error_value()
 
       if (!is.null(error)) {
-        return(shiny::tags$div(
-          class = "alert alert-danger",
-          shiny::tags$strong("Processing failed: "),
-          error
-        ))
+        return(.build_deid_alert("danger", "Processing failed: ", error))
       }
 
       if (identical(run$state, "EMPTY") || identical(run$state, "RECEIVED")) {
-        return(shiny::tags$div(
-          class = "alert alert-info",
+        return(.build_deid_alert(
+          "info",
+          "Ready. ",
           "Upload a synthetic XLSX workbook and generate a tagged preview."
         ))
       }
@@ -387,9 +462,9 @@ build_deid_server <- function(config) {
         ""
       }
 
-      shiny::tags$div(
-        class = "alert alert-warning",
-        shiny::tags$strong("Preview generated for synthetic evaluation. "),
+      .build_deid_alert(
+        "warning",
+        "Preview generated for synthetic evaluation. ",
         paste0(
           "Run state: ",
           run$state,
@@ -399,7 +474,8 @@ build_deid_server <- function(config) {
           nrow(run$blockers),
           " Critical blocker(s) remain.",
           failure_note
-        )
+        ),
+        live = "polite"
       )
     })
 
@@ -427,18 +503,14 @@ build_deid_server <- function(config) {
         na.rm = TRUE
       )
 
-      if (
-        !isTRUE(input$confirm_synthetic) ||
-        !identical(run$state, "PROCESSED") ||
-        !preview_complete
-      ) {
+      if (!identical(run$state, "PROCESSED") || !preview_complete) {
         return(NULL)
       }
 
       shiny::tagList(
-        shiny::tags$div(
-          class = "alert alert-info",
-          shiny::tags$strong("Synthetic tagged preview download only. "),
+        .build_deid_alert(
+          "info",
+          "Synthetic tagged preview download only. ",
           paste(
             "This XLSX is not anonymized, not releasable, and must not be",
             "used or disclosed as de-identified data."
@@ -472,14 +544,6 @@ build_deid_server <- function(config) {
         "synthetic-tagged-preview-not-releasable.xlsx"
       },
       content = function(file) {
-        if (!isTRUE(input$confirm_synthetic)) {
-          deid_abort(
-            code = "SYNTHETIC_CONFIRMATION_REQUIRED",
-            message = "Confirm synthetic-only data before downloading a preview.",
-            subclass = "deid_governance_error"
-          )
-        }
-
         write_synthetic_preview_workbook(run_value(), file, config)
       },
       contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

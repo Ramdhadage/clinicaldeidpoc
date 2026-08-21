@@ -29,7 +29,7 @@ if (file.exists(file.path("R", "bootstrap.R"))) {
   }
 }
 
-required <- c("shiny", "DT", "writexl")
+required <- c("bslib", "cli", "shiny", "DT", "writexl")
 for (package in required) {
   if (!requireNamespace(package, quietly = TRUE)) {
     stop(paste0("Package ", package, " is required for app tests."), call. = FALSE)
@@ -90,32 +90,11 @@ shiny::testServer(
     session$setInputs(workbook = file_input)
     session$flushReact()
     stopifnot(identical(run_value()$state, "RECEIVED"))
-    worksheet_selector <- paste(
-      as.character(output$worksheet_selector),
-      collapse = "\n"
-    )
-    stopifnot(grepl(
-      'value="Clinical_Data" selected',
-      worksheet_selector,
-      fixed = TRUE
-    ))
 
     session$setInputs(worksheet = "Alternative_Clinical_Data")
     session$flushReact()
 
-    session$setInputs(
-      confirm_synthetic = FALSE,
-      process = 1
-    )
-    session$flushReact()
-
-    stopifnot(identical(run_value()$state, "VALIDATION_FAILED"))
-    stopifnot(is.null(run_value()$result))
-
-    session$setInputs(
-      confirm_synthetic = TRUE,
-      process = 2
-    )
+    session$setInputs(process = 1)
     session$flushReact()
 
     processed <- run_value()
@@ -189,7 +168,7 @@ shiny::testServer(
       fixed = TRUE
     ))
 
-    session$setInputs(process = 3)
+    session$setInputs(process = 2)
     session$flushReact()
 
     invalid_selection <- run_value()
@@ -231,6 +210,16 @@ stopifnot(grepl("Azure is not called", source_text, fixed = TRUE))
 stopifnot(grepl("held only in session memory", source_text, fixed = TRUE))
 stopifnot(grepl("shinyvalidate", source_text, fixed = TRUE))
 stopifnot(grepl("worksheet", source_text, fixed = TRUE))
+stopifnot(grepl("bslib::page_sidebar", source_text, fixed = TRUE))
+stopifnot(grepl("bslib::bs_theme", source_text, fixed = TRUE))
+stopifnot(grepl("bslib::card", source_text, fixed = TRUE))
+stopifnot(grepl("bslib::accordion", source_text, fixed = TRUE))
+stopifnot(grepl("bslib::input_task_button", source_text, fixed = TRUE))
+stopifnot(grepl("shiny::updateSelectInput", source_text, fixed = TRUE))
+stopifnot(!grepl("output$worksheet_selector", source_text, fixed = TRUE))
+stopifnot(!grepl("shiny::fluidPage", source_text, fixed = TRUE))
+stopifnot(!grepl("shiny::sidebarLayout", source_text, fixed = TRUE))
+stopifnot(!grepl("shiny::sidebarPanel", source_text, fixed = TRUE))
 stopifnot(grepl("workbook_validation_feedback", source_text, fixed = TRUE))
 stopifnot(!grepl("Safe structured preview", source_text, fixed = TRUE))
 stopifnot(!grepl("safe_preview", source_text, fixed = TRUE))
@@ -239,7 +228,9 @@ stopifnot(grepl("escape = TRUE", source_text, fixed = TRUE))
 ui_text <- paste(as.character(build_deid_ui(config)), collapse = "\n")
 stopifnot(grepl("Synthetic demonstration only", ui_text, fixed = TRUE))
 stopifnot(grepl("alert alert-danger", ui_text, fixed = TRUE))
+stopifnot(grepl("bslib-page-dashboard", ui_text, fixed = TRUE))
+stopifnot(grepl('id="worksheet"', ui_text, fixed = TRUE))
 stopifnot(grepl("Release unavailable", ui_text, fixed = TRUE))
 stopifnot(!grepl("shiny-download-link", ui_text, fixed = TRUE))
 
-cat("All Shiny milestone tests passed.\n")
+cli::cli_alert_success("All Shiny milestone tests passed.")

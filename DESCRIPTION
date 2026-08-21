@@ -22,6 +22,7 @@ RoxygenNote: 7.3.3
 Depends:
     R (>= 4.5.2)
 Imports:
+    bslib,
     curl,
     digest,
     DT,
@@ -33,6 +34,7 @@ Imports:
     writexl,
     yaml
 Suggests:
+    cli,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 Collate:
