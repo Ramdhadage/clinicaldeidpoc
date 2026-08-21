@@ -43,7 +43,8 @@ contains_unsupported_drawing <- function(path, entry_names) {
 inspect_clinical_workbook <- function(
     path,
     original_name = basename(path),
-    config = read_deid_config(".")
+    config = read_deid_config("."),
+    worksheet = config$schema$sheet_name
 ) {
   assert_scalar_character(path, "path")
   assert_scalar_character(original_name, "original_name")
@@ -144,18 +145,61 @@ inspect_clinical_workbook <- function(
   )
 
   required_sheet <- config$schema$sheet_name
-  if (!required_sheet %in% sheets) {
+  selected_sheet <- worksheet
+
+  if (is.null(selected_sheet)) {
+    selected_sheet <- NULL
+  } else if (
+    !is.character(selected_sheet) ||
+      length(selected_sheet) != 1L ||
+      is.na(selected_sheet) ||
+      !nzchar(selected_sheet)
+  ) {
     deid_abort(
-      code = "MISSING_REQUIRED_SHEET",
-      message = "The workbook does not contain the exact worksheet Clinical_Data.",
+      code = "SELECTED_WORKSHEET_REQUIRED",
+      message = "Select one worksheet before processing.",
+      subclass = "deid_input_error"
+    )
+  }
+
+  if (
+    !is.null(selected_sheet) &&
+      !selected_sheet %in% sheets
+  ) {
+    missing_sheet_code <- if (identical(selected_sheet, required_sheet)) {
+      "MISSING_REQUIRED_SHEET"
+    } else {
+      "SELECTED_WORKSHEET_NOT_FOUND"
+    }
+    missing_sheet_message <- if (identical(selected_sheet, required_sheet)) {
+      paste0(
+        "The workbook does not contain the exact worksheet ",
+        required_sheet,
+        "."
+      )
+    } else {
+      paste0(
+        "The workbook does not contain the selected worksheet ",
+        selected_sheet,
+        "."
+      )
+    }
+    deid_abort(
+      code = missing_sheet_code,
+      message = missing_sheet_message,
       subclass = "deid_missing_sheet"
     )
   }
 
-  additional_sheets <- setdiff(sheets, required_sheet)
+  comparison_sheet <- if (is.null(selected_sheet)) {
+    required_sheet
+  } else {
+    selected_sheet
+  }
+  additional_sheets <- setdiff(sheets, comparison_sheet)
   if (
     length(additional_sheets) > 0L &&
-    !isTRUE(config$schema$allow_additional_sheets)
+      !isTRUE(config$schema$allow_additional_sheets)
   ) {
     deid_abort(
       code = "ADDITIONAL_SHEETS_NOT_ALLOWED",
@@ -170,6 +214,7 @@ inspect_clinical_workbook <- function(
       size_bytes = file_size,
       input_hash = hash_file(path),
       required_sheet = required_sheet,
+      selected_sheet = selected_sheet,
       additional_sheets = additional_sheets,
       all_sheets = sheets
     ),
@@ -181,25 +226,39 @@ inspect_clinical_workbook <- function(
 read_clinical_workbook <- function(
     path,
     original_name = basename(path),
-    config = read_deid_config(".")
+    config = read_deid_config("."),
+    worksheet = config$schema$sheet_name
 ) {
   inspection <- inspect_clinical_workbook(
     path = path,
     original_name = original_name,
-    config = config
+    config = config,
+    worksheet = worksheet
   )
+
+  if (is.null(inspection$selected_sheet)) {
+    deid_abort(
+      code = "SELECTED_WORKSHEET_REQUIRED",
+      message = "Select one worksheet before processing.",
+      subclass = "deid_input_error"
+    )
+  }
 
   data <- tryCatch(
     readxl::read_excel(
       path,
-      sheet = inspection$required_sheet,
+      sheet = inspection$selected_sheet,
       col_types = "guess",
       .name_repair = "minimal"
     ),
     error = function(e) {
       deid_abort(
         code = "WORKBOOK_READ_FAILED",
-        message = "The Clinical_Data worksheet could not be read.",
+        message = paste0(
+          "The selected worksheet ",
+          inspection$selected_sheet,
+          " could not be read."
+        ),
         subclass = "deid_input_error"
       )
     }

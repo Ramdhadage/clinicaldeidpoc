@@ -16,6 +16,8 @@ build_deid_ui <- function(config) {
           "Choose an XLSX workbook",
           accept = ".xlsx"
         ),
+        shiny::uiOutput("worksheet_selector"),
+        shiny::uiOutput("workbook_validation"),
         shiny::checkboxInput(
           "confirm_synthetic",
           "I confirm this workbook contains synthetic test data only.",
@@ -28,8 +30,8 @@ build_deid_ui <- function(config) {
         ),
         shiny::hr(),
         shiny::tags$p(
-          shiny::tags$strong("Required worksheet: "),
-          config$schema$sheet_name
+          shiny::tags$strong("Worksheet selection: "),
+          "Choose a worksheet after upload. It must match the approved column contract."
         ),
         shiny::tags$p(
           shiny::tags$strong("Release enabled: "),
@@ -108,11 +110,167 @@ build_deid_server <- function(config) {
   force(config)
 
   function(input, output, session) {
+    require_deid_namespace("shinyvalidate")
+
     run_value <- shiny::reactiveVal(new_deid_run(config$hash))
     error_value <- shiny::reactiveVal(NULL)
+    input_validator <- shinyvalidate::InputValidator$new()
+    input_validator$add_rule(
+      "workbook",
+      shinyvalidate::sv_required("Select an XLSX workbook.")
+    )
+    input_validator$add_rule(
+      "worksheet",
+      shinyvalidate::sv_required("Select one worksheet to process.")
+    )
+    input_validator$add_rule("confirm_synthetic", function(value) {
+      if (!isTRUE(value)) {
+        "Confirm that the workbook contains synthetic test data only."
+      }
+    })
+    input_validator$enable()
+
+    workbook_inspection <- shiny::reactive({
+      shiny::req(input$workbook)
+
+      tryCatch(
+        inspect_clinical_workbook(
+          path = input$workbook$datapath,
+          original_name = input$workbook$name,
+          config = config,
+          worksheet = NULL
+        ),
+        error = function(e) e
+      )
+    })
+
+    selected_dataset <- shiny::reactive({
+      shiny::req(input$workbook)
+
+      selected_sheet <- input$worksheet
+      if (
+        !is.character(selected_sheet) ||
+          length(selected_sheet) != 1L ||
+          is.na(selected_sheet) ||
+          !nzchar(selected_sheet)
+      ) {
+        return(NULL)
+      }
+
+      tryCatch(
+        read_clinical_workbook(
+          path = input$workbook$datapath,
+          original_name = input$workbook$name,
+          config = config,
+          worksheet = selected_sheet
+        ),
+        error = function(e) e
+      )
+    })
+
+    workbook_validation_message <- shiny::reactive({
+      if (is.null(input$workbook)) {
+        return(NULL)
+      }
+
+      inspection <- workbook_inspection()
+      if (inherits(inspection, "condition")) {
+        return(conditionMessage(inspection))
+      }
+
+      selected_sheet <- input$worksheet
+      if (
+        !is.character(selected_sheet) ||
+          length(selected_sheet) != 1L ||
+          is.na(selected_sheet) ||
+          !nzchar(selected_sheet)
+      ) {
+        return("Select a worksheet to validate against the approved column contract.")
+      }
+
+      dataset <- selected_dataset()
+      if (inherits(dataset, "condition")) {
+        return(conditionMessage(dataset))
+      }
+
+      schema_error <- tryCatch(
+        {
+          validate_clinical_schema(dataset$data, config)
+          NULL
+        },
+        error = function(e) e
+      )
+      if (inherits(schema_error, "condition")) {
+        return(paste(
+          "The selected worksheet does not match the approved column contract:",
+          conditionMessage(schema_error)
+        ))
+      }
+
+      if (!isTRUE(input$confirm_synthetic)) {
+        return("Confirm that the workbook contains synthetic test data only.")
+      }
+
+      NULL
+    })
+
+    output$worksheet_selector <- shiny::renderUI({
+      if (is.null(input$workbook)) {
+        return(NULL)
+      }
+
+      inspection <- workbook_inspection()
+      if (inherits(inspection, "condition")) {
+        return(NULL)
+      }
+
+      sheets <- inspection$all_sheets
+      selected_sheet <- input$worksheet
+      if (
+        !is.character(selected_sheet) ||
+          length(selected_sheet) != 1L ||
+          is.na(selected_sheet) ||
+          !selected_sheet %in% sheets
+      ) {
+        selected_sheet <- sheets[[1]]
+      }
+
+      shiny::selectInput(
+        "worksheet",
+        "Worksheet to process",
+        choices = stats::setNames(sheets, sheets),
+        selected = selected_sheet
+      )
+    })
+
+    output$workbook_validation <- shiny::renderUI({
+      message <- workbook_validation_message()
+      if (is.null(message)) {
+        return(NULL)
+      }
+
+      shiny::tags$div(
+        id = "workbook_validation_feedback",
+        class = "alert alert-danger",
+        role = "alert",
+        `aria-live` = "assertive",
+        shiny::tags$strong("Workbook validation: "),
+        message
+      )
+    })
 
     shiny::observeEvent(
       input$workbook,
+      {
+        current <- run_value()
+        run_value(invalidate_run(current))
+        error_value(NULL)
+      },
+      ignoreInit = TRUE
+    )
+
+    shiny::observeEvent(
+      input$worksheet,
       {
         current <- run_value()
         run_value(invalidate_run(current))
@@ -130,27 +288,29 @@ build_deid_server <- function(config) {
 
         tryCatch(
           {
-            if (is.null(input$workbook)) {
+            if (
+              !isTRUE(input_validator$is_valid()) ||
+                !is.null(workbook_validation_message())
+            ) {
               deid_abort(
-                code = "WORKBOOK_REQUIRED",
-                message = "Select an XLSX workbook before processing.",
+                code = "WORKBOOK_VALIDATION_FAILED",
+                message = "Correct the highlighted workbook validation errors before processing.",
                 subclass = "deid_input_error"
               )
             }
 
-            if (!isTRUE(input$confirm_synthetic)) {
+            dataset <- selected_dataset()
+            if (is.null(dataset)) {
               deid_abort(
-                code = "SYNTHETIC_CONFIRMATION_REQUIRED",
-                message = "Confirm that the workbook contains synthetic test data only.",
-                subclass = "deid_governance_error"
+                code = "SELECTED_WORKSHEET_REQUIRED",
+                message = "Select one worksheet before processing.",
+                subclass = "deid_input_error"
               )
             }
 
-            dataset <- read_clinical_workbook(
-              path = input$workbook$datapath,
-              original_name = input$workbook$name,
-              config = config
-            )
+            if (inherits(dataset, "condition")) {
+              stop(dataset)
+            }
 
             run <- run_structured_deidentification(
               input_dataset = dataset,

@@ -186,6 +186,17 @@ write_fixture_workbook <- function(
 }
 
 
+write_named_fixture_workbook <- function(sheets) {
+  if (!requireNamespace("writexl", quietly = TRUE)) {
+    stop("The writexl package is required for workbook tests.", call. = FALSE)
+  }
+
+  path <- tempfile(fileext = ".xlsx")
+  writexl::write_xlsx(sheets, path)
+  path
+}
+
+
 config <- read_deid_config(project_root)
 internal_function_for_test <- function(name) {
   if (exists(name, mode = "function", inherits = TRUE)) {
@@ -315,7 +326,7 @@ run_test("configuration rejects action drift", {
 })
 
 
-run_test("valid workbook reads the exact Clinical_Data sheet", {
+run_test("default workbook read preserves Clinical_Data selection", {
   path <- write_fixture_workbook(
     synthetic_fixture(),
     include_additional_sheet = TRUE
@@ -329,8 +340,102 @@ run_test("valid workbook reads the exact Clinical_Data sheet", {
   )
 
   expect_true(inherits(dataset, "InputDataset"))
+  expect_identical(dataset$metadata$selected_sheet, "Clinical_Data")
   expect_identical(dataset$metadata$additional_sheets, "Read_Me")
   expect_identical(nrow(dataset$data), 3L)
+})
+
+
+run_test("a selected worksheet with the approved schema is read", {
+  path <- write_named_fixture_workbook(list(
+    Read_Me = data.frame(note = "Synthetic test fixture"),
+    Analysis_Data = synthetic_fixture(),
+    Clinical_Data = synthetic_fixture()[0, , drop = FALSE]
+  ))
+  on.exit(unlink(path, force = TRUE), add = TRUE)
+
+  inspection <- inspect_clinical_workbook(
+    path,
+    original_name = "synthetic.xlsx",
+    config = config,
+    worksheet = "Analysis_Data"
+  )
+  dataset <- read_clinical_workbook(
+    path,
+    original_name = "synthetic.xlsx",
+    config = config,
+    worksheet = "Analysis_Data"
+  )
+
+  expect_identical(inspection$selected_sheet, "Analysis_Data")
+  expect_identical(dataset$metadata$selected_sheet, "Analysis_Data")
+  expect_identical(names(dataset$data), names(synthetic_fixture()))
+  expect_identical(nrow(dataset$data), 3L)
+})
+
+
+run_test("an unavailable worksheet selection is rejected before reading data", {
+  path <- write_named_fixture_workbook(list(
+    Clinical_Data = synthetic_fixture(),
+    Analysis_Data = synthetic_fixture()
+  ))
+  on.exit(unlink(path, force = TRUE), add = TRUE)
+
+  expect_deid_error(
+    read_clinical_workbook(
+      path,
+      original_name = "synthetic.xlsx",
+      config = config,
+      worksheet = "Not_A_Worksheet"
+    ),
+    "deid_missing_sheet",
+    "SELECTED_WORKSHEET_NOT_FOUND"
+  )
+})
+
+
+run_test("a blank worksheet selection is rejected before reading data", {
+  path <- write_named_fixture_workbook(list(
+    Clinical_Data = synthetic_fixture(),
+    Analysis_Data = synthetic_fixture()
+  ))
+  on.exit(unlink(path, force = TRUE), add = TRUE)
+
+  expect_deid_error(
+    read_clinical_workbook(
+      path,
+      original_name = "synthetic.xlsx",
+      config = config,
+      worksheet = NULL
+    ),
+    "deid_input_error",
+    "SELECTED_WORKSHEET_REQUIRED"
+  )
+})
+
+
+run_test("a selected worksheet with the wrong schema cannot be processed", {
+  invalid_data <- synthetic_fixture()
+  invalid_data$Unexpected_Column <- "not approved"
+  path <- write_named_fixture_workbook(list(
+    Clinical_Data = synthetic_fixture(),
+    Wrong_Schema = invalid_data
+  ))
+  on.exit(unlink(path, force = TRUE), add = TRUE)
+
+  selected_dataset <- read_clinical_workbook(
+    path,
+    original_name = "synthetic.xlsx",
+    config = config,
+    worksheet = "Wrong_Schema"
+  )
+
+  expect_identical(selected_dataset$metadata$selected_sheet, "Wrong_Schema")
+  expect_deid_error(
+    run_structured_deidentification(selected_dataset, config),
+    "deid_invalid_schema",
+    "UNEXPECTED_COLUMNS"
+  )
 })
 
 

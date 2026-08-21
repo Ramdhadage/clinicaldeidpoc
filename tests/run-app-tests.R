@@ -58,7 +58,16 @@ sample_data <- data.frame(
 workbook <- tempfile(fileext = ".xlsx")
 on.exit(unlink(workbook, force = TRUE), add = TRUE)
 writexl::write_xlsx(
-  list(Clinical_Data = sample_data),
+  list(
+    Clinical_Data = sample_data,
+    Alternative_Clinical_Data = sample_data,
+    Wrong_Schema = data.frame(
+      Record_No = "1",
+      Patient_Name = "Synthetic",
+      stringsAsFactors = FALSE,
+      check.names = FALSE
+    )
+  ),
   workbook
 )
 
@@ -81,6 +90,18 @@ shiny::testServer(
     session$setInputs(workbook = file_input)
     session$flushReact()
     stopifnot(identical(run_value()$state, "RECEIVED"))
+    worksheet_selector <- paste(
+      as.character(output$worksheet_selector),
+      collapse = "\n"
+    )
+    stopifnot(grepl(
+      'value="Clinical_Data" selected',
+      worksheet_selector,
+      fixed = TRUE
+    ))
+
+    session$setInputs(worksheet = "Alternative_Clinical_Data")
+    session$flushReact()
 
     session$setInputs(
       confirm_synthetic = FALSE,
@@ -150,6 +171,35 @@ shiny::testServer(
       fixed = TRUE
     ))
 
+    session$setInputs(worksheet = "Wrong_Schema")
+    session$flushReact()
+
+    validation_feedback <- paste(
+      as.character(output$workbook_validation),
+      collapse = "\n"
+    )
+    stopifnot(grepl(
+      "does not match the approved column contract",
+      validation_feedback,
+      fixed = TRUE
+    ))
+    stopifnot(grepl(
+      "alert alert-danger",
+      validation_feedback,
+      fixed = TRUE
+    ))
+
+    session$setInputs(process = 3)
+    session$flushReact()
+
+    invalid_selection <- run_value()
+    stopifnot(identical(invalid_selection$state, "VALIDATION_FAILED"))
+    stopifnot(is.null(invalid_selection$result))
+    stopifnot(identical(
+      invalid_selection$failure$code,
+      "WORKBOOK_VALIDATION_FAILED"
+    ))
+
     replacement_input <- file_input
     replacement_input$name <- "replacement-synthetic.xlsx"
     session$setInputs(workbook = replacement_input)
@@ -179,6 +229,9 @@ stopifnot(grepl("detection_details", source_text, fixed = TRUE))
 stopifnot(grepl("deterministic preview only", source_text, fixed = TRUE))
 stopifnot(grepl("Azure is not called", source_text, fixed = TRUE))
 stopifnot(grepl("held only in session memory", source_text, fixed = TRUE))
+stopifnot(grepl("shinyvalidate", source_text, fixed = TRUE))
+stopifnot(grepl("worksheet", source_text, fixed = TRUE))
+stopifnot(grepl("workbook_validation_feedback", source_text, fixed = TRUE))
 stopifnot(!grepl("Safe structured preview", source_text, fixed = TRUE))
 stopifnot(!grepl("safe_preview", source_text, fixed = TRUE))
 stopifnot(grepl("escape = TRUE", source_text, fixed = TRUE))
