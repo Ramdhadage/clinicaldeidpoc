@@ -12,7 +12,8 @@ Locked planning decisions:
 
 - Primary outcome: **Safe Harbor-candidate dataset**, not a compliance declaration.
 - Primary evaluation data: organization-approved PHI, processed only after Phase 0 approval.
-- Input contract: .xlsx workbook containing the exact worksheet **Clinical_Data**.
+- Input contract: .xlsx workbook; the user selects one worksheet, which must
+  match the approved column contract before processing.
 - Hosting: organization-approved enterprise R platform.
 - Released output: no stable identifiers or cross-run linkage.
 - Architecture: deterministic R pipeline plus Azure AI Language Text PII; no RAG or autonomous agent in the initial PoC.
@@ -61,14 +62,14 @@ Explicitly out of scope:
 - RAG-based anonymization
 - Images, scanned documents, audio, OCR, and embedded workbook media
 - Non-English narratives in v1
-- Multiple worksheets, arbitrary schemas, and longitudinal cross-run tokenization
+- Arbitrary schemas and longitudinal cross-run tokenization
 - Production-scale performance, disaster recovery, or enterprise rollout
 
 ## 2. User Requirements
 
 | ID | User requirement | Reason | Proposed solution | Validation method | Priority |
 |---|---|---|---|---|---|
-| UR-01 | Accept clinical Excel input | Required source format | Accept .xlsx; require worksheet Clinical_Data; create a new output workbook | Positive and malformed-workbook tests | Must |
+| UR-01 | Accept clinical Excel input | Required source format | Accept .xlsx; require user-selected worksheet to match the approved column contract; create a new output workbook | Positive and malformed-workbook tests | Must |
 | UR-02 | Handle known structured identifiers | Prevent direct identifier leakage | Versioned schema and deterministic rule catalogue | Unit and end-to-end labelled tests | Must |
 | UR-03 | Detect PII in clinical narratives | Identifiers appear inside notes | Local known-value/regex pass plus Azure Text PII | Span-level ground-truth evaluation | Must |
 | UR-04 | Support configurable rules | Policies vary by dataset and organization | Reviewed YAML configuration with schema validation and versioning | Configuration contract tests | Must |
@@ -91,7 +92,7 @@ Explicitly out of scope:
     Secure upload + workbook inspection
         |
         v
-    Schema validation: exact sheet "Clinical_Data"
+    Schema validation: user-selected worksheet against approved contract
         |
         v
     Column classification
@@ -133,7 +134,7 @@ Component responsibilities:
 | Component | Responsibility |
 |---|---|
 | Secure input | Enforce file size/type, isolate temporary storage, calculate restricted integrity hash, and invalidate previous run state |
-| Workbook inspector | Require Clinical_Data; flag additional sheets but never copy them into output; reject macros, encrypted files, external links, unsupported media, or unreadable workbooks |
+| Workbook inspector | List worksheets for user selection; validate the selected worksheet against the approved contract, never copy unselected sheets into output, and reject macros, encrypted files, external links, unsupported media, or unreadable workbooks |
 | Schema validator | Require the approved column contract and expected types; reject missing, duplicate, or unresolved columns |
 | Column classifier | Assign each field to direct identifier, quasi-identifier, free text, non-sensitive, or unresolved |
 | Structured engine | Apply typed, deterministic transformations based on a versioned rule catalogue |
@@ -369,7 +370,7 @@ Azure retry policy: bounded exponential backoff with jitter, respect Retry-After
 
 | Layer | Planned validation | Failure behavior |
 |---|---|---|
-| Schema | .xlsx; exact Clinical_Data; approved columns/types; unique names; allowable size/rows; no unsupported workbook content | Reject input |
+| Schema | .xlsx; user-selected worksheet; approved columns/types; unique names; allowable size/rows; no unsupported workbook content | Reject input |
 | Pre-processing | Every column classified; language supported; dates parseable; no unresolved data type | Block processing/release |
 | Structured transformation | Known values absent after normalization; expected types and missingness preserved | Critical exception |
 | Free text | Validate spans/offsets; local normalized scanner; second post-redaction scan; compare with labels during evaluation | Critical exception or review |

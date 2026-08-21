@@ -7,7 +7,8 @@ Milestone 1.2 is a **synthetic-only, non-releasing structured-data foundation wi
 It currently:
 
 - Accepts only an XLSX workbook.
-- Requires the exact worksheet name **Clinical_Data**.
+- After upload, select the worksheet to process. The selected worksheet must
+  match the approved column contract before it can be processed.
 - Requires the eight approved columns:
   - **Record_No**
   - **Patient_Name**
@@ -222,7 +223,7 @@ To stop the app, return to PowerShell and press **Ctrl+C**.
 | Scenario | Expected result |
 |---|---|
 | CSV, XLS, or XLSM selected | Input rejected |
-| Clinical_Data missing or misspelled | Input rejected |
+| Selected worksheet missing, unavailable, or incompatible with the approved column contract | Input rejected with validation feedback |
 | Required column missing | Input rejected |
 | Unknown column added | Input rejected |
 | Duplicate column headers | Input rejected |

@@ -29,6 +29,7 @@ Imports:
     openssl,
     readxl,
     shiny,
+    shinyvalidate,
     writexl,
     yaml
 Suggests:
