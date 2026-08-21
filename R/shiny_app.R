@@ -130,12 +130,6 @@ build_deid_ui <- function(
           `aria-label` = "Generate tagged preview"
         ),
         "Generate tagged preview"
-      ),
-      shiny::hr(),
-      shiny::p(
-        class = "small mb-0",
-        shiny::strong("Release enabled: "),
-        shiny::span(class = "badge text-bg-danger", "No")
       )
     ),
     shiny::uiOutput("processing_error"),
