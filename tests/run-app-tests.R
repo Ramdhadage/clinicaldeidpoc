@@ -237,10 +237,14 @@ stopifnot(grepl('`aria-label` = "Generate tagged preview"', source_text, fixed =
 stopifnot(grepl("not anonymized and not releasable", source_text, fixed = TRUE))
 stopifnot(grepl("Anonymized data table", source_text, fixed = TRUE))
 stopifnot(grepl("Synthetic preview only - not validated", source_text, fixed = TRUE))
-stopifnot(grepl("shiny::radioButtons", source_text, fixed = TRUE))
+stopifnot(grepl("bslib::navset_pill", source_text, fixed = TRUE))
+stopifnot(grepl("bslib::nav_panel", source_text, fixed = TRUE))
 stopifnot(grepl("Default clinical data", source_text, fixed = TRUE))
 stopifnot(grepl("Upload XLSX workbook", source_text, fixed = TRUE))
-stopifnot(grepl("shiny::conditionalPanel", source_text, fixed = TRUE))
+stopifnot(grepl('value = "default"', source_text, fixed = TRUE))
+stopifnot(grepl('value = "upload"', source_text, fixed = TRUE))
+stopifnot(!grepl("shiny::radioButtons", source_text, fixed = TRUE))
+stopifnot(!grepl("shiny::conditionalPanel", source_text, fixed = TRUE))
 stopifnot(grepl("label = NULL", source_text, fixed = TRUE))
 stopifnot(!grepl("Preview generated for synthetic evaluation", source_text, fixed = TRUE))
 stopifnot(!grepl("Run state: ", source_text, fixed = TRUE))
@@ -258,13 +262,31 @@ stopifnot(grepl("escape = TRUE", source_text, fixed = TRUE))
 
 ui_text <- paste(as.character(build_deid_ui(config)), collapse = "\n")
 stopifnot(grepl("Synthetic demonstration only", ui_text, fixed = TRUE))
-stopifnot(grepl("alert alert-danger", ui_text, fixed = TRUE))
+stopifnot(grepl(
+  "alert alert-warning alert-dismissible fade show",
+  ui_text,
+  fixed = TRUE
+))
+stopifnot(grepl('data-bs-dismiss="alert"', ui_text, fixed = TRUE))
+stopifnot(grepl(
+  'aria-label="Close synthetic demonstration warning"',
+  ui_text,
+  fixed = TRUE
+))
+dismiss_controls <- gregexpr('data-bs-dismiss="alert"', ui_text, fixed = TRUE)[[1]]
+stopifnot(sum(dismiss_controls > 0L) == 1L)
 stopifnot(grepl("bslib-page-dashboard", ui_text, fixed = TRUE))
 stopifnot(grepl('id="worksheet"', ui_text, fixed = TRUE))
 stopifnot(grepl('id="data_source"', ui_text, fixed = TRUE))
+stopifnot(grepl('data-value="default"', ui_text, fixed = TRUE))
+stopifnot(grepl('data-value="upload"', ui_text, fixed = TRUE))
 stopifnot(grepl("Clinical_PHI_Anonymization_Data.xlsx", ui_text, fixed = TRUE))
 stopifnot(grepl("Release unavailable", ui_text, fixed = TRUE))
 stopifnot(!grepl("shiny-download-link", ui_text, fixed = TRUE))
+stopifnot(
+  regexpr("Synthetic demonstration only", ui_text, fixed = TRUE) <
+    regexpr("bslib-page-dashboard", ui_text, fixed = TRUE)
+)
 stopifnot(
   regexpr("Anonymized data table", ui_text, fixed = TRUE) <
     regexpr("Approved column contract", ui_text, fixed = TRUE)

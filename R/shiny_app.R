@@ -31,14 +31,37 @@
 }
 
 
-.build_deid_alert <- function(type, title, ..., id = NULL, live = NULL) {
+.build_deid_alert <- function(
+    type,
+    title,
+    ...,
+    id = NULL,
+    live = NULL,
+    dismissible = FALSE,
+    close_label = "Close"
+) {
+  alert_classes <- c(
+    "alert",
+    paste0("alert-", type),
+    if (dismissible) c("alert-dismissible", "fade", "show"),
+    "mb-0"
+  )
+
   shiny::div(
     id = id,
-    class = paste("alert", paste0("alert-", type), "mb-0"),
+    class = paste(alert_classes, collapse = " "),
     role = "alert",
     `aria-live` = live,
     shiny::strong(title),
-    ...
+    ...,
+    if (dismissible) {
+      shiny::tags$button(
+        type = "button",
+        class = "btn-close",
+        `data-bs-dismiss` = "alert",
+        `aria-label` = close_label
+      )
+    }
   )
 }
 
@@ -50,7 +73,7 @@ build_deid_ui <- function(
   force(config)
   force(default_workbook_name)
 
-  bslib::page_sidebar(
+  page <- bslib::page_sidebar(
     title = shiny::tagList(
       "Clinical Data De-identification PoC",
       shiny::span(
@@ -65,36 +88,37 @@ build_deid_ui <- function(
       title = "Preview controls",
       width = "22rem",
       open = "always",
-      shiny::radioButtons(
-        "data_source",
-        "Data source",
-        choices = c(
-          "Default clinical data" = "default",
-          "Upload XLSX workbook" = "upload"
-        ),
+      bslib::navset_pill(
+        id = "data_source",
         selected = "default",
-        inline = TRUE
-      ),
-      shiny::conditionalPanel(
-        condition = "input.data_source === 'default'",
-        .build_deid_alert(
-          "info",
-          "Default workbook: ",
-          default_workbook_name
-        )
-      ),
-      shiny::conditionalPanel(
-        condition = "input.data_source === 'upload'",
-        shiny::fileInput(
-          "workbook",
-          "Choose an XLSX workbook",
-          accept = ".xlsx"
+        bslib::nav_panel(
+          "Default clinical data",
+          value = "default",
+          .build_deid_alert(
+            "info",
+            "Default workbook: ",
+            default_workbook_name
+          )
         ),
-        shiny::selectInput(
-          "worksheet",
-          "Worksheet to process",
-          choices = character(),
-          selectize = FALSE
+        bslib::nav_panel(
+          "Upload XLSX workbook",
+          value = "upload",
+          shiny::fileInput(
+            "workbook",
+            "Choose an XLSX workbook",
+            accept = ".xlsx"
+          ),
+          shiny::selectInput(
+            "worksheet",
+            "Worksheet to process",
+            choices = character(),
+            selectize = FALSE
+          ),
+          shiny::p(
+        class = "small text-secondary",
+        shiny::strong("Worksheet selection: "),
+        "Choose a worksheet after upload. It must match the approved column contract."
+      ),
         )
       ),
       shiny::uiOutput("workbook_validation"),
@@ -109,22 +133,9 @@ build_deid_ui <- function(
       ),
       shiny::hr(),
       shiny::p(
-        class = "small text-secondary",
-        shiny::strong("Worksheet selection: "),
-        "Choose a worksheet after upload. It must match the approved column contract."
-      ),
-      shiny::p(
         class = "small mb-0",
         shiny::strong("Release enabled: "),
         shiny::span(class = "badge text-bg-danger", "No")
-      )
-    ),
-    .build_deid_alert(
-      "danger",
-      "Synthetic demonstration only. ",
-      paste(
-        "The tagged preview can miss identifiers; do not upload real PHI.",
-        "Anonymized-data download and release remain disabled."
       )
     ),
     shiny::uiOutput("processing_error"),
@@ -240,6 +251,19 @@ build_deid_ui <- function(
       )
     )
   )
+
+  synthetic_warning <- .build_deid_alert(
+    "warning",
+    "Synthetic demonstration only. ",
+    paste(
+      "The tagged preview can miss identifiers; do not upload real PHI.",
+      "Anonymized-data download and release remain disabled."
+    ),
+    dismissible = TRUE,
+    close_label = "Close synthetic demonstration warning"
+  )
+
+  shiny::tagList(synthetic_warning, page)
 }
 
 

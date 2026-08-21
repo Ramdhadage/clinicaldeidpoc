@@ -196,7 +196,7 @@ To stop the app, return to PowerShell and press **Ctrl+C**.
 
 The modernized interface retains the original workflow and section order:
 
-- **Preview controls** in the left sidebar: a radio group for the bundled default workbook or an uploaded XLSX, upload-only workbook and worksheet inputs, and the processing action.
+- **Preview controls** in the left sidebar: side-by-side pill panels for the bundled default workbook or an uploaded XLSX, upload-only workbook and worksheet inputs, and the processing action.
 - **Anonymized data table** with a **Synthetic preview only - not validated** badge, **Approved column contract**, **Detection details - deterministic preview only**, and **Critical validation blockers** in the main area. A single download icon appears in the data-table header after a complete preview is generated, with the table immediately below it.
 - **Preview limitations and tag behavior** in a collapsed accordion below the preview table.
 - A full-screen control on each data card for focused table review.
@@ -204,9 +204,9 @@ The modernized interface retains the original workflow and section order:
 
 No custom application stylesheet or external web font is required; colors, typography, spacing, borders, cards, and responsive behavior come from the pinned Bootstrap 5 theme and Bootstrap utility classes.
 
-1. Confirm that the red banner says **Synthetic demonstration only** and the header badge says **Synthetic only**.
-2. Confirm **Default clinical data** is selected. The app loads `Clinical_PHI_Anonymization_Data.xlsx`, selects `Clinical_Data`, and generates the preview at launch. Treat this bundled workbook as synthetic evaluation data only.
-3. To use another synthetic workbook, select **Upload XLSX workbook**, choose the file, and select a worksheet. The selected worksheet must match the approved column contract.
+1. Confirm that the dismissible yellow banner spans the page above both panels, says **Synthetic demonstration only**, and the header badge says **Synthetic only**. Closing the banner hides the notice for the current browser view only; it does not change any safety or release control.
+2. Confirm the **Default clinical data** pill is selected. The app loads `Clinical_PHI_Anonymization_Data.xlsx`, selects `Clinical_Data`, and generates the preview at launch. Treat this bundled workbook as synthetic evaluation data only.
+3. To use another synthetic workbook, select the **Upload XLSX workbook** pill, choose the file, and select a worksheet. The selected worksheet must match the approved column contract.
 4. Resolve any **Workbook validation** feedback shown below the source controls.
 5. To regenerate the selected source, hover over or focus the play icon to confirm its **Generate tagged preview** tooltip, then select it. The task button prevents duplicate clicks while processing is running.
 6. Review **Anonymized data table** and its **Synthetic preview only - not validated** badge:
