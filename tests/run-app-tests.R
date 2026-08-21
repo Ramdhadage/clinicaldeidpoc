@@ -78,15 +78,32 @@ file_input <- list(
   datapath = workbook
 )
 
-ui <- build_deid_ui(config)
-server <- build_deid_server(config)
+ui <- build_deid_ui(config, "default-synthetic.xlsx")
+server <- build_deid_server(config, workbook)
 app <- shiny::shinyApp(ui = ui, server = server)
 stopifnot(inherits(app, "shiny.appobj"))
 
 shiny::testServer(
   server,
   {
+    session$setInputs(data_source = "default")
     session$flushReact()
+    default_run <- run_value()
+    stopifnot(identical(default_run$state, "PROCESSED"))
+    stopifnot(is.null(error_value()))
+    stopifnot(identical(active_workbook()$source, "default"))
+
+    download_ui <- paste(
+      as.character(output$synthetic_preview_download),
+      collapse = "\n"
+    )
+    download_icons <- gregexpr("fa-download", download_ui, fixed = TRUE)[[1]]
+    stopifnot(sum(download_icons > 0L) == 1L)
+
+    session$setInputs(data_source = "upload")
+    session$flushReact()
+    stopifnot(identical(run_value()$state, "RECEIVED"))
+
     session$setInputs(workbook = file_input)
     session$flushReact()
     stopifnot(identical(run_value()$state, "RECEIVED"))
@@ -200,7 +217,7 @@ stopifnot(grepl("downloadHandler", source_text, fixed = TRUE))
 stopifnot(grepl("downloadButton", source_text, fixed = TRUE))
 stopifnot(grepl("download_synthetic_preview", source_text, fixed = TRUE))
 stopifnot(grepl("not releasable", source_text, fixed = TRUE))
-stopifnot(grepl("Synthetic tagged preview", source_text, fixed = TRUE))
+stopifnot(grepl("synthetic tagged preview", source_text, fixed = TRUE))
 stopifnot(grepl("not validated", source_text, fixed = TRUE))
 stopifnot(grepl("Dates are displayed as [YYYY]", source_text, fixed = TRUE))
 stopifnot(grepl("eight-character hexadecimal", source_text, fixed = TRUE))
@@ -215,6 +232,20 @@ stopifnot(grepl("bslib::bs_theme", source_text, fixed = TRUE))
 stopifnot(grepl("bslib::card", source_text, fixed = TRUE))
 stopifnot(grepl("bslib::accordion", source_text, fixed = TRUE))
 stopifnot(grepl("bslib::input_task_button", source_text, fixed = TRUE))
+stopifnot(grepl("bslib::tooltip", source_text, fixed = TRUE))
+stopifnot(grepl('`aria-label` = "Generate tagged preview"', source_text, fixed = TRUE))
+stopifnot(grepl("not anonymized and not releasable", source_text, fixed = TRUE))
+stopifnot(grepl("Anonymized data table", source_text, fixed = TRUE))
+stopifnot(grepl("Synthetic preview only - not validated", source_text, fixed = TRUE))
+stopifnot(grepl("shiny::radioButtons", source_text, fixed = TRUE))
+stopifnot(grepl("Default clinical data", source_text, fixed = TRUE))
+stopifnot(grepl("Upload XLSX workbook", source_text, fixed = TRUE))
+stopifnot(grepl("shiny::conditionalPanel", source_text, fixed = TRUE))
+stopifnot(grepl("label = NULL", source_text, fixed = TRUE))
+stopifnot(!grepl("Preview generated for synthetic evaluation", source_text, fixed = TRUE))
+stopifnot(!grepl("Run state: ", source_text, fixed = TRUE))
+stopifnot(grepl("processing_error", source_text, fixed = TRUE))
+stopifnot(grepl("Processing failed: ", source_text, fixed = TRUE))
 stopifnot(grepl("shiny::updateSelectInput", source_text, fixed = TRUE))
 stopifnot(!grepl("output$worksheet_selector", source_text, fixed = TRUE))
 stopifnot(!grepl("shiny::fluidPage", source_text, fixed = TRUE))
@@ -230,7 +261,17 @@ stopifnot(grepl("Synthetic demonstration only", ui_text, fixed = TRUE))
 stopifnot(grepl("alert alert-danger", ui_text, fixed = TRUE))
 stopifnot(grepl("bslib-page-dashboard", ui_text, fixed = TRUE))
 stopifnot(grepl('id="worksheet"', ui_text, fixed = TRUE))
+stopifnot(grepl('id="data_source"', ui_text, fixed = TRUE))
+stopifnot(grepl("Clinical_PHI_Anonymization_Data.xlsx", ui_text, fixed = TRUE))
 stopifnot(grepl("Release unavailable", ui_text, fixed = TRUE))
 stopifnot(!grepl("shiny-download-link", ui_text, fixed = TRUE))
+stopifnot(
+  regexpr("Anonymized data table", ui_text, fixed = TRUE) <
+    regexpr("Approved column contract", ui_text, fixed = TRUE)
+)
+stopifnot(
+  regexpr('id="synthetic_preview_download"', ui_text, fixed = TRUE) <
+    regexpr('id="tagged_preview"', ui_text, fixed = TRUE)
+)
 
 cli::cli_alert_success("All Shiny milestone tests passed.")

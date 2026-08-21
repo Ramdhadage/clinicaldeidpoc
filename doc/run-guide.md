@@ -196,26 +196,20 @@ To stop the app, return to PowerShell and press **Ctrl+C**.
 
 The modernized interface retains the original workflow and section order:
 
-- **Preview controls** in the left sidebar: workbook, worksheet, and processing action.
-- **Approved column contract**, **Synthetic tagged preview - not validated**, **Detection details - deterministic preview only**, and **Critical validation blockers** in the main area.
-- **Coverage and tag behavior** in a collapsed accordion inside the preview card.
+- **Preview controls** in the left sidebar: a radio group for the bundled default workbook or an uploaded XLSX, upload-only workbook and worksheet inputs, and the processing action.
+- **Anonymized data table** with a **Synthetic preview only - not validated** badge, **Approved column contract**, **Detection details - deterministic preview only**, and **Critical validation blockers** in the main area. A single download icon appears in the data-table header after a complete preview is generated, with the table immediately below it.
+- **Preview limitations and tag behavior** in a collapsed accordion below the preview table.
 - A full-screen control on each data card for focused table review.
+- Icon-only processing and download controls with accessible labels and hover/focus tooltips.
 
 No custom application stylesheet or external web font is required; colors, typography, spacing, borders, cards, and responsive behavior come from the pinned Bootstrap 5 theme and Bootstrap utility classes.
 
 1. Confirm that the red banner says **Synthetic demonstration only** and the header badge says **Synthetic only**.
-2. In **Preview controls**, select the generated fixture (or another workbook whose synthetic provenance has been confirmed):
-
-       runtime/input/Clinical_PHI_Anonymization_Data_v0.3.xlsx
-
-3. Select the worksheet to process. The worksheet choices are populated after workbook inspection; the selected worksheet must match the approved column contract.
-4. Resolve any **Workbook validation** feedback shown below the worksheet selector.
-5. Select **Generate tagged preview**. The task button prevents duplicate clicks while the synchronous preview operation is running.
-6. Confirm the status reports:
-
-       Run state: PROCESSED
-
-7. Review **Synthetic tagged preview - not validated**:
+2. Confirm **Default clinical data** is selected. The app loads `Clinical_PHI_Anonymization_Data.xlsx`, selects `Clinical_Data`, and generates the preview at launch. Treat this bundled workbook as synthetic evaluation data only.
+3. To use another synthetic workbook, select **Upload XLSX workbook**, choose the file, and select a worksheet. The selected worksheet must match the approved column contract.
+4. Resolve any **Workbook validation** feedback shown below the source controls.
+5. To regenerate the selected source, hover over or focus the play icon to confirm its **Generate tagged preview** tooltip, then select it. The task button prevents duplicate clicks while processing is running.
+6. Review **Anonymized data table** and its **Synthetic preview only - not validated** badge:
 
    - Record_No, MRN, and Patient_ID must contain random eight-character lowercase hexadecimal values, not source values.
    - Patient_Name must contain [Name].
@@ -223,12 +217,12 @@ No custom application stylesheet or external web font is required; colors, typog
    - Known patient names and selected deterministic patterns must be replaced with typed tags.
    - Clinical text that was not detected remains visible for synthetic evaluation.
 
-8. Confirm two Critical blockers are shown:
+7. Confirm two Critical blockers are shown:
 
    - Diagnosis_Journey — NARRATIVE_REDACTION_NOT_VALIDATED
    - Treatment_History — NARRATIVE_REDACTION_NOT_VALIDATED
 
-9. Select **Download synthetic tagged preview (XLSX)** only for synthetic evaluation. The workbook contains `Synthetic_Tagged_Preview` and `Preview_Notice` sheets; it is not anonymized, not releasable, and must not be used or disclosed as de-identified data.
+8. In the data-table header, hover over or focus the single download icon to confirm its non-releasable synthetic-preview tooltip, then select it only for synthetic evaluation. The workbook contains `Synthetic_Tagged_Preview` and `Preview_Notice` sheets; it is not anonymized, not releasable, and must not be used or disclosed as de-identified data.
 
 ## 11. Expected Fail-Closed Behavior
 
