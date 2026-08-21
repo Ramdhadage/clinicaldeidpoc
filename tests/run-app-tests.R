@@ -218,7 +218,6 @@ stopifnot(grepl("downloadButton", source_text, fixed = TRUE))
 stopifnot(grepl("download_synthetic_preview", source_text, fixed = TRUE))
 stopifnot(grepl("not releasable", source_text, fixed = TRUE))
 stopifnot(grepl("synthetic tagged preview", source_text, fixed = TRUE))
-stopifnot(grepl("not validated", source_text, fixed = TRUE))
 stopifnot(grepl("Dates are displayed as [YYYY]", source_text, fixed = TRUE))
 stopifnot(grepl("eight-character hexadecimal", source_text, fixed = TRUE))
 stopifnot(grepl("detection_details", source_text, fixed = TRUE))
@@ -233,10 +232,14 @@ stopifnot(grepl("bslib::card", source_text, fixed = TRUE))
 stopifnot(grepl("bslib::accordion", source_text, fixed = TRUE))
 stopifnot(grepl("bslib::input_task_button", source_text, fixed = TRUE))
 stopifnot(grepl("bslib::tooltip", source_text, fixed = TRUE))
+stopifnot(grepl("shiny::useBusyIndicators", source_text, fixed = TRUE))
+stopifnot(grepl("shiny::busyIndicatorOptions", source_text, fixed = TRUE))
+stopifnot(grepl('spinner_type = "dots"', source_text, fixed = TRUE))
 stopifnot(grepl('`aria-label` = "Generate tagged preview"', source_text, fixed = TRUE))
 stopifnot(grepl("not anonymized and not releasable", source_text, fixed = TRUE))
 stopifnot(grepl("Anonymized data table", source_text, fixed = TRUE))
-stopifnot(grepl("Synthetic preview only - not validated", source_text, fixed = TRUE))
+stopifnot(!grepl("Synthetic only", source_text, fixed = TRUE))
+stopifnot(!grepl("Synthetic preview only - not validated", source_text, fixed = TRUE))
 stopifnot(grepl("bslib::navset_pill", source_text, fixed = TRUE))
 stopifnot(grepl("bslib::nav_panel", source_text, fixed = TRUE))
 stopifnot(grepl("Default clinical data", source_text, fixed = TRUE))
@@ -264,10 +267,32 @@ stopifnot(grepl("escape = TRUE", source_text, fixed = TRUE))
 ui_text <- paste(as.character(build_deid_ui(config)), collapse = "\n")
 stopifnot(grepl("Synthetic demonstration only", ui_text, fixed = TRUE))
 stopifnot(grepl(
+  "dataset.shinyBusySpinners = 'true'",
+  ui_text,
+  fixed = TRUE
+))
+stopifnot(grepl("dataset.shinyBusyPulse = 'true'", ui_text, fixed = TRUE))
+busy_initializers <- gregexpr(
+  "dataset.shinyBusySpinners = 'true'",
+  ui_text,
+  fixed = TRUE
+)[[1]]
+stopifnot(sum(busy_initializers > 0L) == 1L)
+stopifnot(
+  regexpr("dataset.shinyBusySpinners = 'true'", ui_text, fixed = TRUE) <
+    regexpr("Synthetic demonstration only", ui_text, fixed = TRUE)
+)
+stopifnot(lengths(regmatches(
+  ui_text,
+  gregexpr("spinners/dots.svg", ui_text, fixed = TRUE)
+)) == 4L)
+stopifnot(grepl(
   "alert alert-warning alert-dismissible fade show",
   ui_text,
   fixed = TRUE
 ))
+stopifnot(grepl("--bs-alert-bg: #fff3cd", ui_text, fixed = TRUE))
+stopifnot(grepl("--bs-alert-color: #664d03", ui_text, fixed = TRUE))
 stopifnot(grepl('data-bs-dismiss="alert"', ui_text, fixed = TRUE))
 stopifnot(grepl(
   'aria-label="Close synthetic demonstration warning"',
@@ -282,8 +307,11 @@ stopifnot(grepl('id="data_source"', ui_text, fixed = TRUE))
 stopifnot(grepl('data-value="default"', ui_text, fixed = TRUE))
 stopifnot(grepl('data-value="upload"', ui_text, fixed = TRUE))
 stopifnot(grepl("Clinical_PHI_Anonymization_Data.xlsx", ui_text, fixed = TRUE))
+stopifnot(!grepl("Synthetic only", ui_text, fixed = TRUE))
+stopifnot(!grepl("Synthetic preview only - not validated", ui_text, fixed = TRUE))
 stopifnot(!grepl("Release enabled: ", ui_text, fixed = TRUE))
-stopifnot(grepl("Release unavailable", ui_text, fixed = TRUE))
+stopifnot(!grepl("Release unavailable", source_text, fixed = TRUE))
+stopifnot(!grepl("Release unavailable", ui_text, fixed = TRUE))
 stopifnot(!grepl("shiny-download-link", ui_text, fixed = TRUE))
 stopifnot(
   regexpr("Synthetic demonstration only", ui_text, fixed = TRUE) <

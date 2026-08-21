@@ -66,6 +66,17 @@
 }
 
 
+.build_table_busy_indicator <- function() {
+  shiny::busyIndicatorOptions(
+    spinner_type = "dots",
+    spinner_color = "#176b75",
+    spinner_size = "2.5rem",
+    spinner_delay = "150ms",
+    fade_opacity = 0.65
+  )
+}
+
+
 build_deid_ui <- function(
     config,
     default_workbook_name = "Clinical_PHI_Anonymization_Data.xlsx"
@@ -73,20 +84,20 @@ build_deid_ui <- function(
   force(config)
   force(default_workbook_name)
 
+  overall_busy_indicators <- shiny::useBusyIndicators(
+    spinners = TRUE,
+    pulse = TRUE,
+    fade = TRUE
+  )
+
   page <- bslib::page_sidebar(
-    title = shiny::tagList(
-      "Clinical Data De-identification PoC",
-      shiny::span(
-        class = "badge text-bg-danger ms-2 align-middle",
-        "Synthetic only"
-      )
-    ),
+    title = "Clinical Data De-identification PoC",
     theme = .build_deid_theme(),
     class = "bslib-page-dashboard",
     fillable = FALSE,
     sidebar = bslib::sidebar(
       title = "Preview controls",
-      width = "22rem",
+      width = "25rem",
       open = "always",
       bslib::navset_pill(
         id = "data_source",
@@ -135,15 +146,12 @@ build_deid_ui <- function(
     shiny::uiOutput("processing_error"),
     bslib::card(
       full_screen = TRUE,
+      .build_table_busy_indicator(),
       bslib::card_header(
         class = "d-flex align-items-center gap-2",
         shiny::span(
           class = "fw-semibold",
           "Anonymized data table"
-        ),
-        shiny::span(
-          class = "badge text-bg-warning",
-          "Synthetic preview only - not validated"
         ),
         shiny::span(
           class = "ms-auto",
@@ -196,6 +204,7 @@ build_deid_ui <- function(
     ),
     bslib::card(
       full_screen = TRUE,
+      .build_table_busy_indicator(),
       bslib::card_header(
         class = "fw-semibold",
         "Approved column contract"
@@ -207,6 +216,7 @@ build_deid_ui <- function(
     ),
     bslib::card(
       full_screen = TRUE,
+      .build_table_busy_indicator(),
       bslib::card_header(
         class = "fw-semibold",
         "Detection details - deterministic preview only"
@@ -227,37 +237,37 @@ build_deid_ui <- function(
     ),
     bslib::card(
       full_screen = TRUE,
+      .build_table_busy_indicator(),
       bslib::card_header(
         class = "fw-semibold",
         "Critical validation blockers"
       ),
       bslib::card_body(
         fillable = FALSE,
-        DT::DTOutput("blockers"),
-        .build_deid_alert(
-          "warning",
-          "Release unavailable. ",
-          paste(
-            "No anonymized output can be released because Azure PII processing, residual-",
-            "identifier validation, human review, and approval are incomplete."
-          )
-        )
+        DT::DTOutput("blockers")
       )
     )
   )
 
-  synthetic_warning <- .build_deid_alert(
-    "warning",
-    "Synthetic demonstration only. ",
-    paste(
-      "The tagged preview can miss identifiers; do not upload real PHI.",
-      "Anonymized-data download and release remain disabled."
+  synthetic_warning <- shiny::tagAppendAttributes(
+    .build_deid_alert(
+      "warning",
+      "Synthetic demonstration only. ",
+      paste(
+        "The tagged preview can miss identifiers; do not upload real PHI.",
+        "Anonymized-data download and release remain disabled."
+      ),
+      dismissible = TRUE,
+      close_label = "Close synthetic demonstration warning"
     ),
-    dismissible = TRUE,
-    close_label = "Close synthetic demonstration warning"
+    style = paste(
+      "--bs-alert-color: #664d03;",
+      "--bs-alert-bg: #fff3cd;",
+      "--bs-alert-border-color: #ffecb5;"
+    )
   )
 
-  shiny::tagList(synthetic_warning, page)
+  shiny::tagList(overall_busy_indicators, synthetic_warning, page)
 }
 
 
