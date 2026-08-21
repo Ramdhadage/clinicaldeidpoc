@@ -29,7 +29,7 @@ if (file.exists(file.path("R", "bootstrap.R"))) {
   }
 }
 
-required <- c("shiny", "DT", "writexl")
+required <- c("bslib", "cli", "shiny", "DT", "writexl")
 for (package in required) {
   if (!requireNamespace(package, quietly = TRUE)) {
     stop(paste0("Package ", package, " is required for app tests."), call. = FALSE)
@@ -78,44 +78,40 @@ file_input <- list(
   datapath = workbook
 )
 
-ui <- build_deid_ui(config)
-server <- build_deid_server(config)
+ui <- build_deid_ui(config, "default-synthetic.xlsx")
+server <- build_deid_server(config, workbook)
 app <- shiny::shinyApp(ui = ui, server = server)
 stopifnot(inherits(app, "shiny.appobj"))
 
 shiny::testServer(
   server,
   {
+    session$setInputs(data_source = "default")
     session$flushReact()
+    default_run <- run_value()
+    stopifnot(identical(default_run$state, "PROCESSED"))
+    stopifnot(is.null(error_value()))
+    stopifnot(identical(active_workbook()$source, "default"))
+
+    download_ui <- paste(
+      as.character(output$synthetic_preview_download),
+      collapse = "\n"
+    )
+    download_icons <- gregexpr("fa-download", download_ui, fixed = TRUE)[[1]]
+    stopifnot(sum(download_icons > 0L) == 1L)
+
+    session$setInputs(data_source = "upload")
+    session$flushReact()
+    stopifnot(identical(run_value()$state, "RECEIVED"))
+
     session$setInputs(workbook = file_input)
     session$flushReact()
     stopifnot(identical(run_value()$state, "RECEIVED"))
-    worksheet_selector <- paste(
-      as.character(output$worksheet_selector),
-      collapse = "\n"
-    )
-    stopifnot(grepl(
-      'value="Clinical_Data" selected',
-      worksheet_selector,
-      fixed = TRUE
-    ))
 
     session$setInputs(worksheet = "Alternative_Clinical_Data")
     session$flushReact()
 
-    session$setInputs(
-      confirm_synthetic = FALSE,
-      process = 1
-    )
-    session$flushReact()
-
-    stopifnot(identical(run_value()$state, "VALIDATION_FAILED"))
-    stopifnot(is.null(run_value()$result))
-
-    session$setInputs(
-      confirm_synthetic = TRUE,
-      process = 2
-    )
+    session$setInputs(process = 1)
     session$flushReact()
 
     processed <- run_value()
@@ -189,7 +185,7 @@ shiny::testServer(
       fixed = TRUE
     ))
 
-    session$setInputs(process = 3)
+    session$setInputs(process = 2)
     session$flushReact()
 
     invalid_selection <- run_value()
@@ -221,8 +217,7 @@ stopifnot(grepl("downloadHandler", source_text, fixed = TRUE))
 stopifnot(grepl("downloadButton", source_text, fixed = TRUE))
 stopifnot(grepl("download_synthetic_preview", source_text, fixed = TRUE))
 stopifnot(grepl("not releasable", source_text, fixed = TRUE))
-stopifnot(grepl("Synthetic tagged preview", source_text, fixed = TRUE))
-stopifnot(grepl("not validated", source_text, fixed = TRUE))
+stopifnot(grepl("synthetic tagged preview", source_text, fixed = TRUE))
 stopifnot(grepl("Dates are displayed as [YYYY]", source_text, fixed = TRUE))
 stopifnot(grepl("eight-character hexadecimal", source_text, fixed = TRUE))
 stopifnot(grepl("detection_details", source_text, fixed = TRUE))
@@ -231,6 +226,39 @@ stopifnot(grepl("Azure is not called", source_text, fixed = TRUE))
 stopifnot(grepl("held only in session memory", source_text, fixed = TRUE))
 stopifnot(grepl("shinyvalidate", source_text, fixed = TRUE))
 stopifnot(grepl("worksheet", source_text, fixed = TRUE))
+stopifnot(grepl("bslib::page_sidebar", source_text, fixed = TRUE))
+stopifnot(grepl("bslib::bs_theme", source_text, fixed = TRUE))
+stopifnot(grepl("bslib::card", source_text, fixed = TRUE))
+stopifnot(grepl("bslib::accordion", source_text, fixed = TRUE))
+stopifnot(grepl("bslib::input_task_button", source_text, fixed = TRUE))
+stopifnot(grepl("bslib::tooltip", source_text, fixed = TRUE))
+stopifnot(grepl("shiny::useBusyIndicators", source_text, fixed = TRUE))
+stopifnot(grepl("shiny::busyIndicatorOptions", source_text, fixed = TRUE))
+stopifnot(grepl('spinner_type = "dots"', source_text, fixed = TRUE))
+stopifnot(grepl('`aria-label` = "Generate tagged preview"', source_text, fixed = TRUE))
+stopifnot(grepl("not anonymized and not releasable", source_text, fixed = TRUE))
+stopifnot(grepl("Anonymized data table", source_text, fixed = TRUE))
+stopifnot(!grepl("Synthetic only", source_text, fixed = TRUE))
+stopifnot(!grepl("Synthetic preview only - not validated", source_text, fixed = TRUE))
+stopifnot(grepl("bslib::navset_pill", source_text, fixed = TRUE))
+stopifnot(grepl("bslib::nav_panel", source_text, fixed = TRUE))
+stopifnot(grepl("Default clinical data", source_text, fixed = TRUE))
+stopifnot(grepl("Upload XLSX workbook", source_text, fixed = TRUE))
+stopifnot(grepl('value = "default"', source_text, fixed = TRUE))
+stopifnot(grepl('value = "upload"', source_text, fixed = TRUE))
+stopifnot(!grepl("shiny::radioButtons", source_text, fixed = TRUE))
+stopifnot(!grepl("shiny::conditionalPanel", source_text, fixed = TRUE))
+stopifnot(grepl("label = NULL", source_text, fixed = TRUE))
+stopifnot(!grepl("Preview generated for synthetic evaluation", source_text, fixed = TRUE))
+stopifnot(!grepl("Run state: ", source_text, fixed = TRUE))
+stopifnot(!grepl("Release enabled: ", source_text, fixed = TRUE))
+stopifnot(grepl("processing_error", source_text, fixed = TRUE))
+stopifnot(grepl("Processing failed: ", source_text, fixed = TRUE))
+stopifnot(grepl("shiny::updateSelectInput", source_text, fixed = TRUE))
+stopifnot(!grepl("output$worksheet_selector", source_text, fixed = TRUE))
+stopifnot(!grepl("shiny::fluidPage", source_text, fixed = TRUE))
+stopifnot(!grepl("shiny::sidebarLayout", source_text, fixed = TRUE))
+stopifnot(!grepl("shiny::sidebarPanel", source_text, fixed = TRUE))
 stopifnot(grepl("workbook_validation_feedback", source_text, fixed = TRUE))
 stopifnot(!grepl("Safe structured preview", source_text, fixed = TRUE))
 stopifnot(!grepl("safe_preview", source_text, fixed = TRUE))
@@ -238,8 +266,64 @@ stopifnot(grepl("escape = TRUE", source_text, fixed = TRUE))
 
 ui_text <- paste(as.character(build_deid_ui(config)), collapse = "\n")
 stopifnot(grepl("Synthetic demonstration only", ui_text, fixed = TRUE))
-stopifnot(grepl("alert alert-danger", ui_text, fixed = TRUE))
-stopifnot(grepl("Release unavailable", ui_text, fixed = TRUE))
+stopifnot(grepl(
+  "dataset.shinyBusySpinners = 'true'",
+  ui_text,
+  fixed = TRUE
+))
+stopifnot(grepl("dataset.shinyBusyPulse = 'true'", ui_text, fixed = TRUE))
+busy_initializers <- gregexpr(
+  "dataset.shinyBusySpinners = 'true'",
+  ui_text,
+  fixed = TRUE
+)[[1]]
+stopifnot(sum(busy_initializers > 0L) == 1L)
+stopifnot(
+  regexpr("dataset.shinyBusySpinners = 'true'", ui_text, fixed = TRUE) <
+    regexpr("Synthetic demonstration only", ui_text, fixed = TRUE)
+)
+stopifnot(lengths(regmatches(
+  ui_text,
+  gregexpr("spinners/dots.svg", ui_text, fixed = TRUE)
+)) == 4L)
+stopifnot(grepl(
+  "alert alert-warning alert-dismissible fade show",
+  ui_text,
+  fixed = TRUE
+))
+stopifnot(grepl("--bs-alert-bg: #fff3cd", ui_text, fixed = TRUE))
+stopifnot(grepl("--bs-alert-color: #664d03", ui_text, fixed = TRUE))
+stopifnot(grepl('data-bs-dismiss="alert"', ui_text, fixed = TRUE))
+stopifnot(grepl(
+  'aria-label="Close synthetic demonstration warning"',
+  ui_text,
+  fixed = TRUE
+))
+dismiss_controls <- gregexpr('data-bs-dismiss="alert"', ui_text, fixed = TRUE)[[1]]
+stopifnot(sum(dismiss_controls > 0L) == 1L)
+stopifnot(grepl("bslib-page-dashboard", ui_text, fixed = TRUE))
+stopifnot(grepl('id="worksheet"', ui_text, fixed = TRUE))
+stopifnot(grepl('id="data_source"', ui_text, fixed = TRUE))
+stopifnot(grepl('data-value="default"', ui_text, fixed = TRUE))
+stopifnot(grepl('data-value="upload"', ui_text, fixed = TRUE))
+stopifnot(grepl("Clinical_PHI_Anonymization_Data.xlsx", ui_text, fixed = TRUE))
+stopifnot(!grepl("Synthetic only", ui_text, fixed = TRUE))
+stopifnot(!grepl("Synthetic preview only - not validated", ui_text, fixed = TRUE))
+stopifnot(!grepl("Release enabled: ", ui_text, fixed = TRUE))
+stopifnot(!grepl("Release unavailable", source_text, fixed = TRUE))
+stopifnot(!grepl("Release unavailable", ui_text, fixed = TRUE))
 stopifnot(!grepl("shiny-download-link", ui_text, fixed = TRUE))
+stopifnot(
+  regexpr("Synthetic demonstration only", ui_text, fixed = TRUE) <
+    regexpr("bslib-page-dashboard", ui_text, fixed = TRUE)
+)
+stopifnot(
+  regexpr("Anonymized data table", ui_text, fixed = TRUE) <
+    regexpr("Approved column contract", ui_text, fixed = TRUE)
+)
+stopifnot(
+  regexpr('id="synthetic_preview_download"', ui_text, fixed = TRUE) <
+    regexpr('id="tagged_preview"', ui_text, fixed = TRUE)
+)
 
-cat("All Shiny milestone tests passed.\n")
+cli::cli_alert_success("All Shiny milestone tests passed.")

@@ -25,7 +25,9 @@ It currently:
 - Generates the structured ID tokens from secure random bytes once per run, rejects collisions, keeps them only in session memory, and regenerates them for a new run.
 - Applies ordered deterministic transformations to selected narrative patterns, including known names and identifiers, dates, contact details, URLs, IP addresses, labeled codes, addresses, ZIP codes, and facilities.
 - Invalidates previous results whenever another file is uploaded.
-- Blocks anonymized-data release/export because Azure free-text processing, complete validation, human review, and approval have not yet been implemented. A separate synthetic tagged-preview XLSX can be downloaded only after synthetic-data confirmation; it is not anonymized or releasable.
+- Uses a Bootstrap 5 bslib interface with the existing sidebar-and-main-content layout. The sidebar keeps workbook controls together; the main area presents the contract, preview, detection details, and blockers as expandable cards.
+- Keeps the worksheet selector mounted and updates its choices after workbook inspection. This avoids recreating the input with dynamic UI and preserves the selected-input lifecycle managed by Shiny.
+- Blocks anonymized-data release/export because Azure free-text processing, complete validation, human review, and approval have not yet been implemented. A separate synthetic tagged-preview XLSX becomes available only after successful preview processing; it is not anonymized or releasable.
 
 This milestone does **not** produce a releasable or HIPAA-de-identified dataset.
 
@@ -192,18 +194,23 @@ To stop the app, return to PowerShell and press **Ctrl+C**.
 
 ## 10. Use the Shiny Application
 
-1. Confirm that the red banner says **Synthetic demonstration only**.
-2. Select the generated fixture (or another workbook whose synthetic provenance has been confirmed):
+The modernized interface retains the original workflow and section order:
 
-       runtime/input/Clinical_PHI_Anonymization_Data_v0.3.xlsx
+- **Preview controls** in the left sidebar: side-by-side pill panels for the bundled default workbook or an uploaded XLSX, upload-only workbook and worksheet inputs, and the processing action.
+- **Anonymized data table**, **Approved column contract**, **Detection details - deterministic preview only**, and **Critical validation blockers** in the main area. A single download icon appears in the data-table header after a complete preview is generated, with the table immediately below it.
+- **Preview limitations and tag behavior** in a collapsed accordion below the preview table.
+- A full-screen control on each data card for focused table review.
+- Icon-only processing and download controls with accessible labels and hover/focus tooltips.
+- Shiny busy indicators for the main content area and each table card while outputs are calculating or recalculating.
 
-3. Select **I confirm this workbook contains synthetic test data only**.
-4. Select **Generate tagged preview**.
-5. Confirm the status reports:
+No custom application stylesheet or external web font is required; colors, typography, spacing, borders, cards, and responsive behavior come from the pinned Bootstrap 5 theme and Bootstrap utility classes.
 
-       Run state: PROCESSED
-
-6. Review **Synthetic tagged preview - not validated**:
+1. Confirm that the dismissible yellow banner spans the page above both panels and says **Synthetic demonstration only**. Closing the banner hides the notice for the current browser view only; it does not change any safety or release control.
+2. Confirm the **Default clinical data** pill is selected. The app loads `Clinical_PHI_Anonymization_Data.xlsx`, selects `Clinical_Data`, and generates the preview at launch. Treat this bundled workbook as synthetic evaluation data only.
+3. To use another synthetic workbook, select the **Upload XLSX workbook** pill, choose the file, and select a worksheet. The selected worksheet must match the approved column contract.
+4. Resolve any **Workbook validation** feedback shown below the source controls.
+5. To regenerate the selected source, hover over or focus the play icon to confirm its **Generate tagged preview** tooltip, then select it. The task button prevents duplicate clicks while processing is running.
+6. Review **Anonymized data table**:
 
    - Record_No, MRN, and Patient_ID must contain random eight-character lowercase hexadecimal values, not source values.
    - Patient_Name must contain [Name].
@@ -216,7 +223,7 @@ To stop the app, return to PowerShell and press **Ctrl+C**.
    - Diagnosis_Journey — NARRATIVE_REDACTION_NOT_VALIDATED
    - Treatment_History — NARRATIVE_REDACTION_NOT_VALIDATED
 
-8. Select **Download synthetic tagged preview (XLSX)** only for synthetic evaluation. The workbook contains `Synthetic_Tagged_Preview` and `Preview_Notice` sheets; it is not anonymized, not releasable, and must not be used or disclosed as de-identified data.
+8. In the data-table header, hover over or focus the single download icon to confirm its non-releasable synthetic-preview tooltip, then select it only for synthetic evaluation. The workbook contains `Synthetic_Tagged_Preview` and `Preview_Notice` sheets; it is not anonymized, not releasable, and must not be used or disclosed as de-identified data.
 
 ## 11. Expected Fail-Closed Behavior
 
@@ -228,10 +235,9 @@ To stop the app, return to PowerShell and press **Ctrl+C**.
 | Unknown column added | Input rejected |
 | Duplicate column headers | Input rejected |
 | Invalid or future DOB | Processing rejected |
-| Synthetic-data confirmation not selected | Processing rejected |
 | New workbook uploaded | Previous result and validation state cleared |
 | Export called before approval | EXPORT_NOT_APPROVED; no file created |
-| Synthetic tagged-preview download after confirmation | XLSX contains only the derived tagged preview and a non-releasable notice; no run is released |
+| Synthetic tagged-preview download after successful preview processing | XLSX contains only the derived tagged preview and a non-releasable notice; no run is released |
 | Structured processing succeeds | State remains PROCESSED, not APPROVED |
 
 ## 12. Important Data-Handling Rules
